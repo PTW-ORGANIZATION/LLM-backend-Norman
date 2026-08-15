@@ -13,20 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug - check SSH secrets are populated
-        env:
-          KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          HOST: ${{ secrets.SSH_HOST }}
-          USERNAME: ${{ secrets.SSH_USER }}
-          PORT: ${{ secrets.SSH_PORT }}
-        run: |
-          echo "SSH_HOST length: ${#HOST}"
-          echo "SSH_USER length: ${#USERNAME}"
-          echo "SSH_PORT length: ${#PORT}"
-          echo "SSH_PRIVATE_KEY length: ${#KEY}"
-          echo "SSH_PRIVATE_KEY line count: $(printf '%s' "$KEY" | wc -l)"
-          echo "SSH_PRIVATE_KEY first line: $(printf '%s' "$KEY" | head -n1 | cut -c1-20)"
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
