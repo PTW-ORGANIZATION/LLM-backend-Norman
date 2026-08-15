@@ -19,16 +19,16 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, length: 255 })
   email: string;
 
-  @Column({ name: 'password_hash' })
+  @Column({ name: 'password_hash', length: 255 })
   passwordHash: string;
 
-  @Column()
+  @Column({ length: 255 })
   name: string;
 
-  @Column({ type: 'varchar', default: UserRole.USER })
+  @Column({ type: 'varchar', length: 50, default: UserRole.USER })
   role: UserRole;
 
   @Column({ name: 'organization_id', nullable: true })
@@ -38,9 +38,9 @@ export class User {
   @JoinColumn({ name: 'organization_id' })
   organization: Organization | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

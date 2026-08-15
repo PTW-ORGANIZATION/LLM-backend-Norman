@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Conversation } from '../conversations/conversation.entity';
 
@@ -15,6 +16,7 @@ export enum MessageRole {
 }
 
 @Entity('messages')
+@Index('idx_messages_conversation', ['conversationId', 'createdAt'])
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -28,7 +30,7 @@ export class Message {
   @JoinColumn({ name: 'conversation_id' })
   conversation: Conversation;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', length: 20 })
   role: MessageRole;
 
   @Column({ type: 'text' })
@@ -37,6 +39,6 @@ export class Message {
   @Column({ name: 'token_count', type: 'int', nullable: true })
   tokenCount: number | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

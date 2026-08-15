@@ -26,7 +26,7 @@ export class Conversation {
   @Column({ name: 'project_id', type: 'uuid', nullable: true })
   projectId: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   title: string | null;
 
   @Column({ type: 'text', nullable: true })
@@ -35,9 +35,9 @@ export class Conversation {
   @OneToMany(() => Message, (message) => message.conversation)
   messages: Message[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }
