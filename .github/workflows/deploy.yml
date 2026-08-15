@@ -40,6 +40,7 @@ jobs:
             REDIS_PORT=${{ secrets.REDIS_PORT }}
             OLLAMA_HOST=${{ secrets.OLLAMA_HOST }}
             OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
+            OLLAMA_EMBEDDING_MODEL=${{ secrets.OLLAMA_EMBEDDING_MODEL }}
             QUEUE_CONCURRENCY=${{ secrets.QUEUE_CONCURRENCY }}
             QUEUE_JOB_TIMEOUT_MS=${{ secrets.QUEUE_JOB_TIMEOUT_MS }}
             ENVEOF

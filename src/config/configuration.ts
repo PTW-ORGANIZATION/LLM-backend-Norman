@@ -24,10 +24,12 @@ export default () => ({
   ollama: {
     host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
     model: process.env.OLLAMA_MODEL || 'llama3.1:8b-instruct-q4_0',
+    embeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
   },
 
   queue: {
     concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '2', 10),
-    jobTimeoutMs: parseInt(process.env.QUEUE_JOB_TIMEOUT_MS || '60000', 10),
+    // Teto de duração TOTAL de uma resposta em streaming (não é timeout de inatividade).
+    jobTimeoutMs: parseInt(process.env.QUEUE_JOB_TIMEOUT_MS || '300000', 10),
   },
 });

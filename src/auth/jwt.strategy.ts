@@ -8,7 +8,13 @@ import { JwtPayload } from './auth.service';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(config: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // EventSource nativo do browser não manda header customizado, então o
+      // endpoint SSE de streaming de resposta da IA precisa aceitar o token
+      // via query string (?token=...) também.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter('token'),
+      ]),
       ignoreExpiration: false,
       secretOrKey: config.get<string>('jwt.secret'),
     });

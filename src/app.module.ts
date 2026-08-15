@@ -6,6 +6,9 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessagesModule } from './messages/messages.module';
+import { OllamaModule } from './ollama/ollama.module';
+import { DocumentsModule } from './documents/documents.module';
+import { OrchestratorModule } from './orchestrator/orchestrator.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { MessagesModule } from './messages/messages.module';
     AuthModule,
     ConversationsModule,
     MessagesModule,
+    OllamaModule,
+    DocumentsModule,
+    OrchestratorModule,
   ],
 })
 export class AppModule {}
