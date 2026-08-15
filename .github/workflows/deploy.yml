@@ -1,0 +1,53 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script_stop: true
+          script: |
+            set -e
+            cd ~/llm-backend
+
+            git pull origin main
+
+            cat > .env << 'ENVEOF'
+            NODE_ENV=production
+            PORT=${{ secrets.PORT }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRES_IN=7d
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_DATABASE=${{ secrets.DB_DATABASE }}
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            OLLAMA_HOST=${{ secrets.OLLAMA_HOST }}
+            OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
+            QUEUE_CONCURRENCY=${{ secrets.QUEUE_CONCURRENCY }}
+            QUEUE_JOB_TIMEOUT_MS=${{ secrets.QUEUE_JOB_TIMEOUT_MS }}
+            ENVEOF
+
+            mkdir -p logs
+            npm install
+            npm run build
+            npm run migration:run
+            pm2 restart llm-backend || pm2 start ecosystem.config.js --name llm-backend
+            pm2 save
