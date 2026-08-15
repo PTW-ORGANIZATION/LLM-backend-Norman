@@ -23,10 +23,10 @@ export class Conversation {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ name: 'project_id', nullable: true })
+  @Column({ name: 'project_id', type: 'uuid', nullable: true })
   projectId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   title: string | null;
 
   @Column({ type: 'text', nullable: true })

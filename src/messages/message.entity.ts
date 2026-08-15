@@ -34,7 +34,7 @@ export class Message {
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ name: 'token_count', nullable: true })
+  @Column({ name: 'token_count', type: 'int', nullable: true })
   tokenCount: number | null;
 
   @CreateDateColumn({ name: 'created_at' })
