@@ -9,6 +9,7 @@ import { MessagesModule } from './messages/messages.module';
 import { OllamaModule } from './ollama/ollama.module';
 import { DocumentsModule } from './documents/documents.module';
 import { OrchestratorModule } from './orchestrator/orchestrator.module';
+import { IngestionModule } from './ingestion/ingestion.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OrchestratorModule } from './orchestrator/orchestrator.module';
     OllamaModule,
     DocumentsModule,
     OrchestratorModule,
+    IngestionModule,
   ],
 })
 export class AppModule {}

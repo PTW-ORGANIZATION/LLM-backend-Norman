@@ -2,7 +2,11 @@ import { Inject, Module, OnModuleDestroy } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QueueEvents } from 'bullmq';
-import { AI_JOBS_QUEUE_EVENTS, AI_JOBS_QUEUE_NAME } from './queue.constants';
+import {
+  AI_JOBS_QUEUE_EVENTS,
+  AI_JOBS_QUEUE_NAME,
+  INGESTION_JOBS_QUEUE_NAME,
+} from './queue.constants';
 import { JobStreamService } from './job-stream.service';
 
 @Module({
@@ -19,6 +23,7 @@ import { JobStreamService } from './job-stream.service';
       }),
     }),
     BullModule.registerQueue({ name: AI_JOBS_QUEUE_NAME }),
+    BullModule.registerQueue({ name: INGESTION_JOBS_QUEUE_NAME }),
   ],
   providers: [
     {
