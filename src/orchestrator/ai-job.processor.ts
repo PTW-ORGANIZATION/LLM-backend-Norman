@@ -57,9 +57,12 @@ export class AiJobProcessor extends WorkerHost implements OnModuleInit {
       if (organizationId && lastMessage) {
         const embedding = await this.ollamaService.embed(lastMessage.content);
         chunks = await this.documentChunksService.searchSimilar({
-          userId,
-          organizationId,
-          projectId: conversation.projectId,
+          scope: {
+            kind: 'person',
+            userId,
+            organizationId,
+            projectId: conversation.projectId,
+          },
           embedding,
         });
       }
