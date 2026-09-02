@@ -11,6 +11,7 @@ import { KnowledgeNote, KnowledgeNoteKind } from './knowledge-note.entity';
 import { KnowledgeNotesService } from './knowledge-notes.service';
 import { KnowledgeProcessor } from './knowledge.processor';
 import { NoteGenerationService } from './note-generation.service';
+import { BrandGuideNote } from './note-content';
 import { STUDY_DOCUMENT_JOB, StudyDocumentJobData } from './knowledge-job-data.interface';
 
 // Roda contra um Postgres com pgvector e um Ollama de verdade. Fica de fora da
@@ -32,7 +33,7 @@ const config = {
 } as unknown as ConfigService;
 
 const CLIENT_ID = 'it-note-acme';
-const SCOPE_PATH = 'AcmeCorp/01_Brand_Guide';
+const SCOPE_PATH = 'AcmeCorp/01_Brand_Guide_Institucional';
 const SHA = 'd'.repeat(64);
 
 const PAGES = [
@@ -118,7 +119,10 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
       }),
     );
 
-    expect(result.regenerated).toBe(true);
+    expect(result.generated).toEqual([
+      KnowledgeNoteKind.DOCUMENT_SUMMARY,
+      KnowledgeNoteKind.BRAND_GUIDE,
+    ]);
 
     const note = await notesService.findDocumentNote(
       documentId,
@@ -138,8 +142,8 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
   it('a nota é gravada como jsonb consultável, não como texto', async () => {
     const [row] = await dataSource.query(
       `SELECT content->>'resumo' AS resumo, jsonb_typeof(content->'topicos') AS topicos_tipo
-         FROM knowledge_notes WHERE document_id = $1`,
-      [documentId],
+         FROM knowledge_notes WHERE document_id = $1 AND kind = $2`,
+      [documentId, KnowledgeNoteKind.DOCUMENT_SUMMARY],
     );
 
     expect(typeof row.resumo).toBe('string');
@@ -157,14 +161,28 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
       }),
     );
 
-    expect(result.regenerated).toBe(false);
+    expect(result.generated).toEqual([]);
+    expect(result.skipped).toEqual([
+      KnowledgeNoteKind.DOCUMENT_SUMMARY,
+      KnowledgeNoteKind.BRAND_GUIDE,
+    ]);
 
     const [{ count }] = await dataSource.query(
       'SELECT count(*)::int AS count FROM knowledge_notes WHERE document_id = $1',
       [documentId],
     );
-    expect(count).toBe(1);
+    expect(count).toBe(2);
   }, 60000);
+
+  it('extrai do brand guide o tom de voz, as cores e as proibições', async () => {
+    const note = await notesService.findDocumentNote(documentId, KnowledgeNoteKind.BRAND_GUIDE);
+    const content = note?.content as unknown as BrandGuideNote;
+
+    expect(note?.model).toBe(CONFIG['ollama.model']);
+    expect(content.tomDeVoz.toLowerCase()).toContain('direto');
+    expect(content.cores.map((cor) => cor.hex)).toContain('#0F6B3D');
+    expect(content.proibicoes.join(' ').toLowerCase()).toContain('logotipo');
+  });
 
   it('apagar o documento leva a nota junto', async () => {
     const { document } = await new DocumentsService(

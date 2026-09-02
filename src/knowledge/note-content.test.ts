@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DOCUMENT_SUMMARY_VERSION,
   InvalidNoteContentError,
+  normalizeHexColor,
   noteNeedsRegeneration,
+  parseBrandGuideNote,
   parseDocumentSummary,
 } from './note-content';
 
@@ -75,6 +77,82 @@ describe('parseDocumentSummary', () => {
       topicos: [],
       entidades: [],
     });
+  });
+});
+
+describe('normalizeHexColor', () => {
+  it.each([
+    ['#0f6b3d', '#0F6B3D'],
+    ['0F6B3D', '#0F6B3D'],
+    ['#abc', '#AABBCC'],
+  ])('normaliza %s para %s', (raw, expected) => {
+    expect(normalizeHexColor(raw)).toBe(expected);
+  });
+
+  it.each([['verde escuro'], ['#12345'], ['rgb(1,2,3)'], [null], [42]])(
+    'descarta %j, que não é código de cor',
+    (raw) => {
+      expect(normalizeHexColor(raw)).toBe('');
+    },
+  );
+});
+
+describe('parseBrandGuideNote', () => {
+  const VALID_BRAND = {
+    tomDeVoz: 'Direto e caloroso.',
+    publico: 'Cliente final.',
+    fazer: ['falar simples'],
+    evitar: ['jargão'],
+    cores: [{ nome: 'verde Vitalis', hex: '#0F6B3D', uso: 'principal' }],
+    tipografia: ['Inter'],
+    restricoes: ['margem mínima de 2x'],
+    proibicoes: ['distorcer o logotipo'],
+  };
+
+  it('aceita a ficha bem formada', () => {
+    expect(parseBrandGuideNote(VALID_BRAND)).toEqual(VALID_BRAND);
+  });
+
+  it('normaliza o hexadecimal e mantém a cor sem código', () => {
+    const parsed = parseBrandGuideNote({
+      ...VALID_BRAND,
+      cores: [
+        { nome: 'verde', hex: '0f6b3d', uso: 'principal' },
+        { nome: 'areia', hex: 'cor de areia', uso: 'apoio' },
+      ],
+    });
+
+    expect(parsed.cores).toEqual([
+      { nome: 'verde', hex: '#0F6B3D', uso: 'principal' },
+      { nome: 'areia', hex: '', uso: 'apoio' },
+    ]);
+  });
+
+  it('descarta cor sem nome e sem código', () => {
+    const parsed = parseBrandGuideNote({
+      ...VALID_BRAND,
+      cores: [{ uso: 'sei lá' }, 'verde', { nome: 'verde', hex: '#0F6B3D', uso: '' }],
+    });
+
+    expect(parsed.cores).toEqual([{ nome: 'verde', hex: '#0F6B3D', uso: '' }]);
+  });
+
+  it('recusa ficha sem tom de voz, sem cor e sem proibição', () => {
+    expect(() =>
+      parseBrandGuideNote({ ...VALID_BRAND, tomDeVoz: '', cores: [], proibicoes: [] }),
+    ).toThrow(InvalidNoteContentError);
+  });
+
+  it.each([
+    ['só o tom de voz', { tomDeVoz: 'Direto.' }],
+    ['só uma cor', { cores: [{ nome: 'verde', hex: '#0F6B3D', uso: '' }] }],
+    ['só uma proibição', { proibicoes: ['não distorcer'] }],
+  ])('aceita a ficha com %s', (_label, patch) => {
+    expect(() => parseBrandGuideNote(patch)).not.toThrow();
+  });
+
+  it('recusa o que não é objeto JSON', () => {
+    expect(() => parseBrandGuideNote('tom de voz direto')).toThrow(InvalidNoteContentError);
   });
 });
 

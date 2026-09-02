@@ -9,6 +9,7 @@ import {
 
 export enum KnowledgeNoteKind {
   DOCUMENT_SUMMARY = 'document_summary',
+  BRAND_GUIDE = 'brand_guide',
 }
 
 @Entity('knowledge_notes')

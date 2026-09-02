@@ -108,6 +108,134 @@ export function parseDocumentSummary(raw: unknown): DocumentSummary {
   };
 }
 
+export interface BrandColor {
+  nome: string;
+  hex: string;
+  uso: string;
+}
+
+export interface BrandGuideNote {
+  tomDeVoz: string;
+  publico: string;
+  fazer: string[];
+  evitar: string[];
+  cores: BrandColor[];
+  tipografia: string[];
+  restricoes: string[];
+  proibicoes: string[];
+}
+
+export const BRAND_GUIDE_VERSION = 1;
+
+export const BRAND_GUIDE_SCHEMA = {
+  type: 'object',
+  properties: {
+    tomDeVoz: { type: 'string' },
+    publico: { type: 'string' },
+    fazer: { type: 'array', items: { type: 'string' } },
+    evitar: { type: 'array', items: { type: 'string' } },
+    cores: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string' },
+          hex: { type: 'string' },
+          uso: { type: 'string' },
+        },
+        required: ['nome', 'hex', 'uso'],
+      },
+    },
+    tipografia: { type: 'array', items: { type: 'string' } },
+    restricoes: { type: 'array', items: { type: 'string' } },
+    proibicoes: { type: 'array', items: { type: 'string' } },
+  },
+  required: [
+    'tomDeVoz',
+    'publico',
+    'fazer',
+    'evitar',
+    'cores',
+    'tipografia',
+    'restricoes',
+    'proibicoes',
+  ],
+} as const;
+
+const BRAND_LIMITS = {
+  tomDeVoz: 2000,
+  publico: 500,
+  lista: 15,
+  cores: 20,
+};
+
+/**
+ * Normaliza uma cor para `#RRGGBB` maiúsculo.
+ *
+ * Devolve string vazia quando não é um hexadecimal de cor — o modelo às vezes
+ * escreve "verde escuro" no campo, e gravar isso como se fosse código faria a
+ * tela pintar preto.
+ */
+export function normalizeHexColor(value: unknown): string {
+  const raw = asText(value, 20).replace(/^#/, '');
+  if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw
+      .split('')
+      .map((digit) => digit + digit)
+      .join('')
+      .toUpperCase()}`;
+  }
+  return /^[0-9a-fA-F]{6}$/.test(raw) ? `#${raw.toUpperCase()}` : '';
+}
+
+function asColorList(value: unknown): BrandColor[] {
+  const raw = Array.isArray(value) ? value : [];
+  const colors: BrandColor[] = [];
+
+  for (const entry of raw) {
+    if (!isPlainObject(entry)) continue;
+    const nome = asText(entry.nome, 120);
+    const hex = normalizeHexColor(entry.hex);
+    if (!nome && !hex) continue;
+    colors.push({ nome, hex, uso: asText(entry.uso, 300) });
+    if (colors.length === BRAND_LIMITS.cores) break;
+  }
+
+  return colors;
+}
+
+/**
+ * A ficha dirigida de um brand guide, a partir do que o modelo devolveu.
+ *
+ * Lança quando a ficha não traz nem tom de voz, nem cor, nem proibição: um
+ * brand guide sem nenhum dos três não foi lido, e gravar a ficha vazia faria a
+ * comparação de regeração considerá-la pronta para sempre.
+ */
+export function parseBrandGuideNote(raw: unknown): BrandGuideNote {
+  if (!isPlainObject(raw)) {
+    throw new InvalidNoteContentError('a ficha do brand guide precisa ser um objeto JSON');
+  }
+
+  const note: BrandGuideNote = {
+    tomDeVoz: asText(raw.tomDeVoz, BRAND_LIMITS.tomDeVoz),
+    publico: asText(raw.publico, BRAND_LIMITS.publico),
+    fazer: asTextList(raw.fazer, BRAND_LIMITS.lista),
+    evitar: asTextList(raw.evitar, BRAND_LIMITS.lista),
+    cores: asColorList(raw.cores),
+    tipografia: asTextList(raw.tipografia, BRAND_LIMITS.lista),
+    restricoes: asTextList(raw.restricoes, BRAND_LIMITS.lista),
+    proibicoes: asTextList(raw.proibicoes, BRAND_LIMITS.lista),
+  };
+
+  if (!note.tomDeVoz && note.cores.length === 0 && note.proibicoes.length === 0) {
+    throw new InvalidNoteContentError(
+      'a ficha do brand guide veio sem tom de voz, sem cor e sem proibição',
+    );
+  }
+
+  return note;
+}
+
 export interface NoteProvenance {
   model: string;
   generatorVersion: number;
