@@ -6,5 +6,6 @@ export interface IngestionJobData {
   clientId: string;
   scopePath: string;
   storagePath: string;
+  filename: string;
   sha256: string;
 }

@@ -40,6 +40,22 @@ interface SearchSimilarParams {
   embedding: number[];
 }
 
+export interface NewClientChunk {
+  chunkIndex: number;
+  pageNumber: number | null;
+  content: string;
+  embedding: number[];
+}
+
+export interface ReplaceClientChunksParams {
+  documentId: string;
+  clientId: string;
+  scopePath: string;
+  chunks: NewClientChunk[];
+}
+
+const INSERT_BATCH_SIZE = 200;
+
 @Injectable()
 export class DocumentChunksService {
   constructor(
@@ -97,5 +113,52 @@ export class DocumentChunksService {
       // quando a ingestão de documentos existir.
       .limit(RAG_TOP_K)
       .getRawMany<{ content: string }>();
+  }
+
+  /**
+   * Troca todos os chunks de um documento pelos novos, numa transação só.
+   *
+   * Reingerir um arquivo apaga o que havia antes: sem isso, uma segunda versão
+   * do mesmo documento conviveria com a primeira e a busca devolveria o texto
+   * antigo como se fosse atual.
+   *
+   * Grava só escopo de cliente — `user_id` e `organization_id` ficam nulos, que
+   * é o lado do CHECK `chk_document_chunks_scope` que estas linhas satisfazem.
+   */
+  async replaceForDocument(params: ReplaceClientChunksParams): Promise<number> {
+    return this.documentChunksRepository.manager.transaction(async (manager) => {
+      await manager.delete(DocumentChunk, { documentId: params.documentId });
+
+      for (let offset = 0; offset < params.chunks.length; offset += INSERT_BATCH_SIZE) {
+        const batch = params.chunks.slice(offset, offset + INSERT_BATCH_SIZE);
+        const rows: string[] = [];
+        const values: unknown[] = [];
+
+        for (const chunk of batch) {
+          const base = values.length;
+          rows.push(
+            `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}::vector)`,
+          );
+          values.push(
+            params.documentId,
+            params.clientId,
+            params.scopePath,
+            chunk.chunkIndex,
+            chunk.pageNumber,
+            chunk.content,
+            toSql(chunk.embedding),
+          );
+        }
+
+        await manager.query(
+          `INSERT INTO document_chunks
+             (document_id, client_id, scope_path, chunk_index, page_number, content, embedding)
+           VALUES ${rows.join(', ')}`,
+          values,
+        );
+      }
+
+      return params.chunks.length;
+    });
   }
 }

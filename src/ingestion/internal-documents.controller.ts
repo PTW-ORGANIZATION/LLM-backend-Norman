@@ -48,6 +48,7 @@ export class InternalDocumentsController {
         clientId: dto.clientId,
         scopePath: dto.scopePath,
         storagePath: dto.storagePath,
+        filename: dto.filename,
         sha256: dto.sha256,
       },
       {
