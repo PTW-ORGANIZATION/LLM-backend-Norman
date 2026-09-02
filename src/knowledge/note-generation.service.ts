@@ -9,6 +9,11 @@ import {
   parseBrandGuideNote,
   parseDocumentSummary,
 } from './note-content';
+import {
+  CLIENT_SYNTHESIS_SCHEMA,
+  ClientSynthesis,
+  parseClientSynthesis,
+} from './client-dossier';
 
 const DOCUMENT_SUMMARY_SYSTEM = [
   'Você lê documentos de uma agência de publicidade e devolve uma ficha em JSON.',
@@ -73,6 +78,31 @@ export function buildBrandGuidePrompt(request: DocumentSummaryRequest): string {
   ].join('\n');
 }
 
+const CLIENT_SYNTHESIS_SYSTEM = [
+  'Você lê o inventário do acervo de um cliente de uma agência e devolve uma síntese em JSON.',
+  'Fale só do que os resumos dizem; não invente cliente, produto nem campanha que não esteja na lista.',
+  'Escreva em português do Brasil e responda só com o JSON pedido.',
+].join(' ');
+
+export interface ClientSynthesisRequest {
+  clientId: string;
+  corpus: string;
+}
+
+export function buildClientSynthesisPrompt(request: ClientSynthesisRequest): string {
+  return [
+    'Resumos dos documentos que a agência tem deste cliente:',
+    '"""',
+    request.corpus,
+    '"""',
+    '',
+    'Campos:',
+    '- resumo: de três a seis frases sobre quem é o cliente e o que a agência faz para ele.',
+    '- setor: o ramo em que o cliente atua, em poucas palavras.',
+    '- temasRecorrentes: os assuntos que aparecem em mais de um documento.',
+  ].join('\n');
+}
+
 @Injectable()
 export class NoteGenerationService {
   constructor(
@@ -94,6 +124,17 @@ export class NoteGenerationService {
     });
 
     return parseDocumentSummary(raw);
+  }
+
+  async synthesizeClient(request: ClientSynthesisRequest): Promise<ClientSynthesis> {
+    const raw = await this.ollamaService.generateJson({
+      system: CLIENT_SYNTHESIS_SYSTEM,
+      prompt: buildClientSynthesisPrompt(request),
+      schema: CLIENT_SYNTHESIS_SCHEMA,
+      timeoutMs: this.config.get<number>('knowledge.studyTimeoutMs', 180000),
+    });
+
+    return parseClientSynthesis(raw);
   }
 
   async extractBrandGuide(request: DocumentSummaryRequest): Promise<BrandGuideNote> {

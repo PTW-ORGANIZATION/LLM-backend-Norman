@@ -3,10 +3,8 @@ import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Job, Queue, UnrecoverableError } from 'bullmq';
 import { INGESTION_JOBS_QUEUE_NAME, KNOWLEDGE_JOBS_QUEUE_NAME } from '../queue/queue.constants';
-import {
-  STUDY_DOCUMENT_JOB,
-  StudyDocumentJobData,
-} from '../knowledge/knowledge-job-data.interface';
+import { KnowledgeJobData } from '../knowledge/knowledge-job-data.interface';
+import { enqueueDocumentStudy } from '../knowledge/knowledge-queue';
 import { DocumentsService } from '../documents/documents.service';
 import { DocumentStatus } from '../documents/document.entity';
 import { DocumentChunksService, NewClientChunk } from '../documents/document-chunks.service';
@@ -38,7 +36,7 @@ export class IngestionProcessor extends WorkerHost implements OnModuleInit {
     private readonly ollamaService: OllamaService,
     private readonly documentContent: DocumentContentPort,
     @InjectQueue(KNOWLEDGE_JOBS_QUEUE_NAME)
-    private readonly knowledgeQueue: Queue<StudyDocumentJobData>,
+    private readonly knowledgeQueue: Queue<KnowledgeJobData>,
   ) {
     super();
   }
@@ -111,23 +109,13 @@ export class IngestionProcessor extends WorkerHost implements OnModuleInit {
 
   private async enqueueStudy(data: IngestionJobData): Promise<void> {
     try {
-      await this.knowledgeQueue.add(
-        STUDY_DOCUMENT_JOB,
-        {
-          documentId: data.documentId,
-          clientId: data.clientId,
-          scopePath: data.scopePath,
-          filename: data.filename,
-          sha256: data.sha256,
-        },
-        {
-          jobId: `${data.documentId}:${data.sha256}`,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 15000 },
-          removeOnComplete: 1000,
-          removeOnFail: 5000,
-        },
-      );
+      await enqueueDocumentStudy(this.knowledgeQueue, {
+        documentId: data.documentId,
+        clientId: data.clientId,
+        scopePath: data.scopePath,
+        filename: data.filename,
+        sha256: data.sha256,
+      });
     } catch (error) {
       // O documento já está vetorizado e consultável; falhar a ingestão aqui a
       // desfaria e revetorizaria tudo por causa da nota, que é o acessório.

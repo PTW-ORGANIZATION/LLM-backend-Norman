@@ -4,10 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { DocumentChunksService } from '../documents/document-chunks.service';
 import { KnowledgeNote, KnowledgeNoteKind } from './knowledge-note.entity';
 import { KnowledgeNotesService } from './knowledge-notes.service';
-import { KnowledgeProcessor } from './knowledge.processor';
+import { ConsolidateResult, KnowledgeProcessor, StudyResult } from './knowledge.processor';
 import { NoteGenerationService } from './note-generation.service';
 import { BrandGuideNote, DocumentSummary, InvalidNoteContentError } from './note-content';
-import { STUDY_DOCUMENT_JOB, StudyDocumentJobData } from './knowledge-job-data.interface';
+import { ClientSynthesis, DocumentNoteRow } from './client-dossier';
+import {
+  CONSOLIDATE_CLIENT_JOB,
+  KnowledgeJobData,
+  STUDY_DOCUMENT_JOB,
+  StudyDocumentJobData,
+} from './knowledge-job-data.interface';
+import { Queue } from 'bullmq';
 
 const MODEL = 'llama3.1:8b-instruct-q4_0';
 const SHA = 'a'.repeat(64);
@@ -35,6 +42,12 @@ const SUMMARY: DocumentSummary = {
   entidades: ['Vitalis'],
 };
 
+const SYNTHESIS: ClientSynthesis = {
+  resumo: 'Cliente de saúde que faz campanhas sazonais.',
+  setor: 'saúde',
+  temasRecorrentes: ['verão'],
+};
+
 const BRAND: BrandGuideNote = {
   tomDeVoz: 'Direto e caloroso.',
   publico: 'Cliente final.',
@@ -50,8 +63,10 @@ function buildProcessor(
   options: {
     chunks?: string[];
     existingNotes?: Partial<Record<KnowledgeNoteKind, Partial<KnowledgeNote>>>;
+    clientNotes?: DocumentNoteRow[];
     summarize?: () => Promise<DocumentSummary>;
     extractBrand?: () => Promise<BrandGuideNote>;
+    synthesize?: () => Promise<ClientSynthesis>;
   } = {},
 ) {
   const config = {
@@ -64,46 +79,92 @@ function buildProcessor(
   } as unknown as DocumentChunksService;
 
   const saved: Array<Record<string, unknown>> = [];
+  const savedDossiers: Array<Record<string, unknown>> = [];
   const notesService = {
     findDocumentNote: vi.fn(
       async (_documentId: string, kind: KnowledgeNoteKind) =>
         (options.existingNotes?.[kind] ?? null) as KnowledgeNote | null,
     ),
+    findClientNote: vi.fn(
+      async (_clientId: string, kind: KnowledgeNoteKind) =>
+        (options.existingNotes?.[kind] ?? null) as KnowledgeNote | null,
+    ),
+    listDocumentNotes: vi.fn(async () => options.clientNotes ?? []),
+    forgetClientNote: vi.fn(async () => 1),
     saveDocumentNote: vi.fn(async (note: Record<string, unknown>) => {
       saved.push(note);
+      return note as unknown as KnowledgeNote;
+    }),
+    saveClientNote: vi.fn(async (note: Record<string, unknown>) => {
+      savedDossiers.push(note);
       return note as unknown as KnowledgeNote;
     }),
   } as unknown as KnowledgeNotesService;
 
   const summarizeDocument = vi.fn(options.summarize ?? (async () => SUMMARY));
   const extractBrandGuide = vi.fn(options.extractBrand ?? (async () => BRAND));
+  const synthesizeClient = vi.fn(options.synthesize ?? (async () => SYNTHESIS));
   const noteGeneration = {
     get model() {
       return MODEL;
     },
     summarizeDocument,
     extractBrandGuide,
+    synthesizeClient,
   } as unknown as NoteGenerationService;
 
+  const enqueued: Array<{ name: string; data: unknown; opts: Record<string, unknown> }> = [];
+  const queue = {
+    add: async (name: string, data: unknown, opts: Record<string, unknown>) => {
+      enqueued.push({ name, data, opts });
+      return { id: opts.jobId };
+    },
+  } as unknown as Queue<KnowledgeJobData>;
+
   return {
-    processor: new KnowledgeProcessor(config, chunksService, notesService, noteGeneration),
+    processor: new KnowledgeProcessor(
+      config,
+      chunksService,
+      notesService,
+      noteGeneration,
+      queue,
+    ),
+    enqueued,
     chunksService,
     notesService,
     summarizeDocument,
     extractBrandGuide,
+    synthesizeClient,
     saved,
+    savedDossiers,
   };
 }
 
-function job(name: string, data: StudyDocumentJobData = JOB_DATA): Job<StudyDocumentJobData> {
-  return { name, data } as Job<StudyDocumentJobData>;
+function job(name: string, data: unknown = JOB_DATA): Job<KnowledgeJobData> {
+  return { name, data } as Job<KnowledgeJobData>;
+}
+
+async function study(
+  processor: KnowledgeProcessor,
+  data: StudyDocumentJobData = JOB_DATA,
+): Promise<StudyResult> {
+  return (await processor.process(job(STUDY_DOCUMENT_JOB, data))) as StudyResult;
+}
+
+async function consolidate(
+  processor: KnowledgeProcessor,
+  clientId = 'cli-vitalis',
+): Promise<ConsolidateResult> {
+  return (await processor.process(
+    job(CONSOLIDATE_CLIENT_JOB, { clientId }),
+  )) as ConsolidateResult;
 }
 
 describe('KnowledgeProcessor — resumo por documento', () => {
   it('gera a nota e grava o modelo e a versão que a produziram', async () => {
     const { processor, saved, summarizeDocument } = buildProcessor();
 
-    const result = await processor.process(job(STUDY_DOCUMENT_JOB));
+    const result = await study(processor);
 
     expect(result).toEqual({
       documentId: 'doc-1',
@@ -134,7 +195,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       },
     });
 
-    const result = await processor.process(job(STUDY_DOCUMENT_JOB));
+    const result = await study(processor);
 
     expect(result.generated).toEqual([]);
     expect(result.skipped).toEqual([KnowledgeNoteKind.DOCUMENT_SUMMARY]);
@@ -151,7 +212,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       existingNotes: { [KnowledgeNoteKind.DOCUMENT_SUMMARY]: existing },
     });
 
-    const result = await processor.process(job(STUDY_DOCUMENT_JOB));
+    const result = await study(processor);
 
     expect(result.generated).toEqual([KnowledgeNoteKind.DOCUMENT_SUMMARY]);
     expect(summarizeDocument).toHaveBeenCalledOnce();
@@ -160,7 +221,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
   it('documento sem chunks não vira nota e não repete', async () => {
     const { processor, summarizeDocument } = buildProcessor({ chunks: [] });
 
-    await expect(processor.process(job(STUDY_DOCUMENT_JOB))).rejects.toThrow(UnrecoverableError);
+    await expect(study(processor)).rejects.toThrow(UnrecoverableError);
     expect(summarizeDocument).not.toHaveBeenCalled();
   });
 
@@ -171,7 +232,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       },
     });
 
-    await expect(processor.process(job(STUDY_DOCUMENT_JOB))).rejects.toThrow(UnrecoverableError);
+    await expect(study(processor)).rejects.toThrow(UnrecoverableError);
     expect(notesService.saveDocumentNote).not.toHaveBeenCalled();
   });
 
@@ -182,7 +243,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       },
     });
 
-    await expect(processor.process(job(STUDY_DOCUMENT_JOB))).rejects.not.toBeInstanceOf(
+    await expect(study(processor)).rejects.not.toBeInstanceOf(
       UnrecoverableError,
     );
   });
@@ -198,7 +259,7 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
   it('documento comum não paga a extração dirigida', async () => {
     const { processor, extractBrandGuide } = buildProcessor();
 
-    await processor.process(job(STUDY_DOCUMENT_JOB));
+    await study(processor);
 
     expect(extractBrandGuide).not.toHaveBeenCalled();
   });
@@ -206,7 +267,7 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
   it('brand guide ganha as duas notas', async () => {
     const { processor, saved, extractBrandGuide, summarizeDocument } = buildProcessor();
 
-    const result = await processor.process(job(STUDY_DOCUMENT_JOB, BRAND_JOB_DATA));
+    const result = await study(processor, BRAND_JOB_DATA);
 
     expect(result.generated).toEqual([
       KnowledgeNoteKind.DOCUMENT_SUMMARY,
@@ -224,7 +285,7 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
   it('o documento é lido do banco uma vez só para as duas notas', async () => {
     const { processor, chunksService } = buildProcessor();
 
-    await processor.process(job(STUDY_DOCUMENT_JOB, BRAND_JOB_DATA));
+    await study(processor, BRAND_JOB_DATA);
 
     expect(chunksService.contentForDocument).toHaveBeenCalledOnce();
   });
@@ -240,7 +301,7 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
       },
     });
 
-    const result = await processor.process(job(STUDY_DOCUMENT_JOB, BRAND_JOB_DATA));
+    const result = await study(processor, BRAND_JOB_DATA);
 
     expect(result.generated).toEqual([KnowledgeNoteKind.BRAND_GUIDE]);
     expect(result.skipped).toEqual([KnowledgeNoteKind.DOCUMENT_SUMMARY]);
@@ -255,9 +316,131 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
       },
     });
 
-    await expect(processor.process(job(STUDY_DOCUMENT_JOB, BRAND_JOB_DATA))).rejects.toThrow(
-      UnrecoverableError,
-    );
+    await expect(study(processor, BRAND_JOB_DATA)).rejects.toThrow(UnrecoverableError);
     expect(saved.map((note) => note.kind)).toEqual([KnowledgeNoteKind.DOCUMENT_SUMMARY]);
+  });
+});
+
+describe('KnowledgeProcessor — dossiê do cliente', () => {
+  function clientNote(overrides: Partial<DocumentNoteRow> = {}): DocumentNoteRow {
+    return {
+      documentId: 'doc-1',
+      kind: KnowledgeNoteKind.DOCUMENT_SUMMARY,
+      filename: 'briefing.pdf',
+      scopePath: 'Vitalis/03_Campanhas',
+      sourceFingerprint: SHA,
+      content: { ...SUMMARY },
+      ...overrides,
+    };
+  }
+
+  it('consolida o acervo num dossiê com a marca copiada da ficha', async () => {
+    const { processor, savedDossiers, synthesizeClient } = buildProcessor({
+      clientNotes: [
+        clientNote(),
+        clientNote({
+          documentId: 'doc-2',
+          kind: KnowledgeNoteKind.BRAND_GUIDE,
+          filename: 'manual.pdf',
+          scopePath: 'Vitalis/01_Brand_Guide_Institucional',
+          content: { ...BRAND },
+        }),
+      ],
+    });
+
+    const result = await consolidate(processor);
+
+    expect(result).toMatchObject({ clientId: 'cli-vitalis', documents: 1, regenerated: true });
+    expect(synthesizeClient).toHaveBeenCalledOnce();
+    expect(savedDossiers[0]).toMatchObject({
+      clientId: 'cli-vitalis',
+      kind: KnowledgeNoteKind.CLIENT_DOSSIER,
+      model: MODEL,
+      generatorVersion: 1,
+    });
+    expect(savedDossiers[0].content).toMatchObject({
+      resumo: SYNTHESIS.resumo,
+      setor: 'saúde',
+      tomDeVoz: BRAND.tomDeVoz,
+      cores: BRAND.cores,
+      proibicoes: BRAND.proibicoes,
+    });
+  });
+
+  it('acervo que não mudou não chama o modelo', async () => {
+    const notes = [clientNote()];
+    const { processor: primeiro, savedDossiers } = buildProcessor({ clientNotes: notes });
+    await consolidate(primeiro);
+
+    const { processor, synthesizeClient } = buildProcessor({
+      clientNotes: notes,
+      existingNotes: {
+        [KnowledgeNoteKind.CLIENT_DOSSIER]: {
+          model: MODEL,
+          generatorVersion: 1,
+          sourceFingerprint: savedDossiers[0].sourceFingerprint as string,
+        },
+      },
+    });
+
+    const result = await consolidate(processor);
+
+    expect(result.regenerated).toBe(false);
+    expect(synthesizeClient).not.toHaveBeenCalled();
+  });
+
+  it('cliente que ficou sem acervo perde o dossiê', async () => {
+    const { processor, notesService, synthesizeClient } = buildProcessor({ clientNotes: [] });
+
+    const result = await consolidate(processor);
+
+    expect(result).toEqual({ clientId: 'cli-vitalis', documents: 0, regenerated: true });
+    expect(notesService.forgetClientNote).toHaveBeenCalledWith(
+      'cli-vitalis',
+      KnowledgeNoteKind.CLIENT_DOSSIER,
+    );
+    expect(synthesizeClient).not.toHaveBeenCalled();
+  });
+
+  it('estudar um documento agenda a consolidação, com id fixo por cliente', async () => {
+    const { processor, enqueued } = buildProcessor();
+
+    await study(processor);
+
+    expect(enqueued).toEqual([
+      {
+        name: CONSOLIDATE_CLIENT_JOB,
+        data: { clientId: 'cli-vitalis' },
+        opts: expect.objectContaining({ jobId: 'dossier:cli-vitalis', removeOnComplete: true }),
+      },
+    ]);
+  });
+
+  it('nota que não precisou ser refeita não agenda consolidação', async () => {
+    const { processor, enqueued } = buildProcessor({
+      existingNotes: {
+        [KnowledgeNoteKind.DOCUMENT_SUMMARY]: {
+          model: MODEL,
+          generatorVersion: 1,
+          sourceFingerprint: SHA,
+        },
+      },
+    });
+
+    await study(processor);
+
+    expect(enqueued).toEqual([]);
+  });
+
+  it('síntese inválida não vira dossiê nem repete', async () => {
+    const { processor, notesService } = buildProcessor({
+      clientNotes: [clientNote()],
+      synthesize: async () => {
+        throw new InvalidNoteContentError('a síntese do cliente veio sem "resumo"');
+      },
+    });
+
+    await expect(consolidate(processor)).rejects.toThrow(UnrecoverableError);
+    expect(notesService.saveClientNote).not.toHaveBeenCalled();
   });
 });

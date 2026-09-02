@@ -1,9 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
 import { InternalAuthGuard } from '../auth/internal-auth.guard';
 import { DocumentsService } from '../documents/documents.service';
-import { INGESTION_JOBS_QUEUE_NAME } from '../queue/queue.constants';
+import { INGESTION_JOBS_QUEUE_NAME, KNOWLEDGE_JOBS_QUEUE_NAME } from '../queue/queue.constants';
+import { KnowledgeJobData } from '../knowledge/knowledge-job-data.interface';
+import { enqueueClientConsolidation } from '../knowledge/knowledge-queue';
 import { IngestionJobData } from './ingestion-job-data.interface';
 import {
   ForgetPathDto,
@@ -15,10 +18,15 @@ import {
 @UseGuards(InternalAuthGuard)
 @Controller('internal/documents')
 export class InternalDocumentsController {
+  private readonly logger = new Logger(InternalDocumentsController.name);
+
   constructor(
+    private readonly config: ConfigService,
     private readonly documentsService: DocumentsService,
     @InjectQueue(INGESTION_JOBS_QUEUE_NAME)
     private readonly ingestionQueue: Queue<IngestionJobData>,
+    @InjectQueue(KNOWLEDGE_JOBS_QUEUE_NAME)
+    private readonly knowledgeQueue: Queue<KnowledgeJobData>,
   ) {}
 
   /**
@@ -71,13 +79,36 @@ export class InternalDocumentsController {
   /** Esquece um arquivo que saiu do repositório do Norman. */
   @Post('forget-path')
   async forgetPath(@Body() dto: ForgetPathDto) {
-    return { removed: await this.documentsService.forgetPath(dto) };
+    const removed = await this.documentsService.forgetPath(dto);
+    if (removed > 0) await this.scheduleConsolidation(dto.clientId);
+    return { removed };
   }
 
   /** Esquece uma pasta inteira do repositório do Norman, e tudo abaixo dela. */
   @Post('forget-prefix')
   async forgetPrefix(@Body() dto: ForgetPrefixDto) {
-    return { removed: await this.documentsService.forgetPrefix(dto) };
+    const removed = await this.documentsService.forgetPrefix(dto);
+    if (removed > 0) await this.scheduleConsolidation(dto.clientId);
+    return { removed };
+  }
+
+  /**
+   * Arquivo que sai do acervo também muda o dossiê do cliente: sem isto ele
+   * continuaria descrevendo um documento que já não existe.
+   */
+  private async scheduleConsolidation(clientId: string): Promise<void> {
+    try {
+      await enqueueClientConsolidation(
+        this.knowledgeQueue,
+        clientId,
+        this.config.get<number>('knowledge.dossierDelayMs', 60000),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Não consegui enfileirar o dossiê de ${clientId}: ` +
+          `${error instanceof Error ? error.message : error}`,
+      );
+    }
   }
 
   /**

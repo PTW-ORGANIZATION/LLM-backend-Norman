@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DocumentChunk } from '../documents/document-chunk.entity';
@@ -9,10 +9,15 @@ import { DocumentsService } from '../documents/documents.service';
 import { OllamaService } from '../ollama/ollama.service';
 import { KnowledgeNote, KnowledgeNoteKind } from './knowledge-note.entity';
 import { KnowledgeNotesService } from './knowledge-notes.service';
-import { KnowledgeProcessor } from './knowledge.processor';
+import { ConsolidateResult, KnowledgeProcessor, StudyResult } from './knowledge.processor';
 import { NoteGenerationService } from './note-generation.service';
 import { BrandGuideNote } from './note-content';
-import { STUDY_DOCUMENT_JOB, StudyDocumentJobData } from './knowledge-job-data.interface';
+import {
+  CONSOLIDATE_CLIENT_JOB,
+  KnowledgeJobData,
+  STUDY_DOCUMENT_JOB,
+  StudyDocumentJobData,
+} from './knowledge-job-data.interface';
 
 // Roda contra um Postgres com pgvector e um Ollama de verdade. Fica de fora da
 // suíte padrão porque exige infraestrutura: só liga com KNOWLEDGE_IT_DATABASE
@@ -43,9 +48,19 @@ const PAGES = [
     'É proibido usar o logotipo sobre foto sem tarja e proibido distorcer as proporções.',
 ];
 
-function job(data: StudyDocumentJobData): Job<StudyDocumentJobData> {
-  return { name: STUDY_DOCUMENT_JOB, data } as Job<StudyDocumentJobData>;
+function job(name: string, data: unknown): Job<KnowledgeJobData> {
+  return { name, data } as Job<KnowledgeJobData>;
 }
+
+// A consolidação é enfileirada pelo próprio processador; aqui ela é chamada à
+// mão para o teste não depender de um Redis.
+const enqueued: Array<{ name: string; data: unknown }> = [];
+const queue = {
+  add: async (name: string, data: unknown, opts: Record<string, unknown>) => {
+    enqueued.push({ name, data });
+    return { id: opts.jobId };
+  },
+} as unknown as Queue<KnowledgeJobData>;
 
 describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
   let dataSource: DataSource;
@@ -76,6 +91,7 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
       chunksService,
       notesService,
       new NoteGenerationService(config, ollama),
+      queue,
     );
 
     const { document } = await documentsService.registerClientDocument({
@@ -109,15 +125,15 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
   });
 
   it('estuda o documento e grava a nota em JSON validado', async () => {
-    const result = await processor.process(
-      job({
+    const result = (await processor.process(
+      job(STUDY_DOCUMENT_JOB, {
         documentId,
         clientId: CLIENT_ID,
         scopePath: SCOPE_PATH,
         filename: 'manual.pdf',
         sha256: SHA,
       }),
-    );
+    )) as StudyResult;
 
     expect(result.generated).toEqual([
       KnowledgeNoteKind.DOCUMENT_SUMMARY,
@@ -151,15 +167,15 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
   });
 
   it('a segunda passada não regera nem duplica a nota', async () => {
-    const result = await processor.process(
-      job({
+    const result = (await processor.process(
+      job(STUDY_DOCUMENT_JOB, {
         documentId,
         clientId: CLIENT_ID,
         scopePath: SCOPE_PATH,
         filename: 'manual.pdf',
         sha256: SHA,
       }),
-    );
+    )) as StudyResult;
 
     expect(result.generated).toEqual([]);
     expect(result.skipped).toEqual([
@@ -183,6 +199,36 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     expect(content.cores.map((cor) => cor.hex)).toContain('#0F6B3D');
     expect(content.proibicoes.join(' ').toLowerCase()).toContain('logotipo');
   });
+
+  it('consolida o dossiê do cliente a partir das notas gravadas', async () => {
+    const result = (await processor.process(
+      job(CONSOLIDATE_CLIENT_JOB, { clientId: CLIENT_ID }),
+    )) as ConsolidateResult;
+
+    expect(result).toMatchObject({ clientId: CLIENT_ID, documents: 1, regenerated: true });
+
+    const dossier = await notesService.findClientNote(
+      CLIENT_ID,
+      KnowledgeNoteKind.CLIENT_DOSSIER,
+    );
+
+    expect(dossier?.documentId).toBeNull();
+    expect(dossier?.model).toBe(CONFIG['ollama.model']);
+    expect(typeof dossier?.content.resumo).toBe('string');
+    expect((dossier?.content.resumo as string).length).toBeGreaterThan(20);
+    expect(dossier?.content.cores).toEqual(
+      expect.arrayContaining([expect.objectContaining({ hex: '#0F6B3D' })]),
+    );
+    expect((dossier?.content.documentos as unknown[])).toHaveLength(1);
+  }, 300000);
+
+  it('segunda consolidação do mesmo acervo não chama o modelo de novo', async () => {
+    const result = (await processor.process(
+      job(CONSOLIDATE_CLIENT_JOB, { clientId: CLIENT_ID }),
+    )) as ConsolidateResult;
+
+    expect(result.regenerated).toBe(false);
+  }, 60000);
 
   it('apagar o documento leva a nota junto', async () => {
     const { document } = await new DocumentsService(

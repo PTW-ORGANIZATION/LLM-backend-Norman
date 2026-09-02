@@ -53,6 +53,10 @@ export default () => ({
     // de tokens: é o que o extrator sabe medir sem chamar o modelo.
     excerptMaxChars: parseInt(process.env.KNOWLEDGE_EXCERPT_MAX_CHARS || '12000', 10),
     studyTimeoutMs: parseInt(process.env.KNOWLEDGE_STUDY_TIMEOUT_MS || '180000', 10),
+    // O dossiê espera para não ser refeito uma vez por arquivo durante uma
+    // rajada de envio: o id fixo do job junta a rajada inteira em um só.
+    dossierDelayMs: parseInt(process.env.KNOWLEDGE_DOSSIER_DELAY_MS || '60000', 10),
+    dossierMaxDocuments: parseInt(process.env.KNOWLEDGE_DOSSIER_MAX_DOCUMENTS || '25', 10),
   },
 
   queue: {
