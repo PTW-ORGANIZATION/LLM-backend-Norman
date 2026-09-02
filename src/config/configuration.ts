@@ -31,6 +31,21 @@ export default () => ({
     host: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
     model: process.env.OLLAMA_MODEL || 'llama3.1:8b-instruct-q4_0',
     embeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
+    visionModel: process.env.OLLAMA_VISION_MODEL || 'minicpm-v',
+  },
+
+  ingestion: {
+    // Onde o Norman devolve os bytes de um arquivo do repositório.
+    normanBaseUrl: process.env.NORMAN_INTERNAL_URL || '',
+    fetchTimeoutMs: parseInt(process.env.INGESTION_FETCH_TIMEOUT_MS || '120000', 10),
+    // OCR de página escaneada custa mais de um minuto por página nesta máquina.
+    // O teto existe para um PDF de 400 páginas não segurar a fila por um dia.
+    ocrMaxPages: parseInt(process.env.INGESTION_OCR_MAX_PAGES || '20', 10),
+    ocrTimeoutMs: parseInt(process.env.INGESTION_OCR_TIMEOUT_MS || '180000', 10),
+    ocrScale: parseFloat(process.env.INGESTION_OCR_SCALE || '2'),
+    chunkSize: parseInt(process.env.INGESTION_CHUNK_SIZE || '1200', 10),
+    chunkOverlap: parseInt(process.env.INGESTION_CHUNK_OVERLAP || '150', 10),
+    embedBatchSize: parseInt(process.env.INGESTION_EMBED_BATCH_SIZE || '16', 10),
   },
 
   queue: {
