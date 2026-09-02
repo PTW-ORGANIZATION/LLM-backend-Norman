@@ -1,8 +1,12 @@
 import { Logger, OnModuleInit } from '@nestjs/common';
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { Job, UnrecoverableError } from 'bullmq';
-import { INGESTION_JOBS_QUEUE_NAME } from '../queue/queue.constants';
+import { Job, Queue, UnrecoverableError } from 'bullmq';
+import { INGESTION_JOBS_QUEUE_NAME, KNOWLEDGE_JOBS_QUEUE_NAME } from '../queue/queue.constants';
+import {
+  STUDY_DOCUMENT_JOB,
+  StudyDocumentJobData,
+} from '../knowledge/knowledge-job-data.interface';
 import { DocumentsService } from '../documents/documents.service';
 import { DocumentStatus } from '../documents/document.entity';
 import { DocumentChunksService, NewClientChunk } from '../documents/document-chunks.service';
@@ -33,6 +37,8 @@ export class IngestionProcessor extends WorkerHost implements OnModuleInit {
     private readonly textExtraction: TextExtractionService,
     private readonly ollamaService: OllamaService,
     private readonly documentContent: DocumentContentPort,
+    @InjectQueue(KNOWLEDGE_JOBS_QUEUE_NAME)
+    private readonly knowledgeQueue: Queue<StudyDocumentJobData>,
   ) {
     super();
   }
@@ -82,6 +88,8 @@ export class IngestionProcessor extends WorkerHost implements OnModuleInit {
       await this.documentsService.updateStatus(documentId, DocumentStatus.READY);
       this.logger.log(`${filename}: ${written} chunks (${extracted.source})`);
 
+      await this.enqueueStudy(job.data);
+
       return { documentId, chunks: written, source: extracted.source };
     } catch (error) {
       await this.documentsService.updateStatus(documentId, DocumentStatus.FAILED);
@@ -98,6 +106,35 @@ export class IngestionProcessor extends WorkerHost implements OnModuleInit {
         throw new UnrecoverableError(error.message);
       }
       throw error;
+    }
+  }
+
+  private async enqueueStudy(data: IngestionJobData): Promise<void> {
+    try {
+      await this.knowledgeQueue.add(
+        STUDY_DOCUMENT_JOB,
+        {
+          documentId: data.documentId,
+          clientId: data.clientId,
+          scopePath: data.scopePath,
+          filename: data.filename,
+          sha256: data.sha256,
+        },
+        {
+          jobId: `${data.documentId}:${data.sha256}`,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 15000 },
+          removeOnComplete: 1000,
+          removeOnFail: 5000,
+        },
+      );
+    } catch (error) {
+      // O documento já está vetorizado e consultável; falhar a ingestão aqui a
+      // desfaria e revetorizaria tudo por causa da nota, que é o acessório.
+      this.logger.warn(
+        `Não consegui enfileirar o estudo de "${data.filename}": ` +
+          `${error instanceof Error ? error.message : error}`,
+      );
     }
   }
 

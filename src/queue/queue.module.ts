@@ -6,6 +6,7 @@ import {
   AI_JOBS_QUEUE_EVENTS,
   AI_JOBS_QUEUE_NAME,
   INGESTION_JOBS_QUEUE_NAME,
+  KNOWLEDGE_JOBS_QUEUE_NAME,
 } from './queue.constants';
 import { JobStreamService } from './job-stream.service';
 
@@ -24,6 +25,7 @@ import { JobStreamService } from './job-stream.service';
     }),
     BullModule.registerQueue({ name: AI_JOBS_QUEUE_NAME }),
     BullModule.registerQueue({ name: INGESTION_JOBS_QUEUE_NAME }),
+    BullModule.registerQueue({ name: KNOWLEDGE_JOBS_QUEUE_NAME }),
   ],
   providers: [
     {

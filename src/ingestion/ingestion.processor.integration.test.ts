@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DocumentChunk } from '../documents/document-chunk.entity';
@@ -35,6 +35,23 @@ const config = {
 
 const SCOPE_PATH = 'AcmeCorp/Campanhas/Verao2026';
 
+// A fila de estudo não faz parte do que este teste verifica: o que importa aqui
+// é o documento virar chunks consultáveis. O dublê registra o que foi
+// enfileirado para que o teste possa afirmar que a ingestão chamou a próxima
+// etapa sem depender de um Redis.
+function stubKnowledgeQueue() {
+  const added: Array<{ name: string; data: unknown }> = [];
+  return {
+    added,
+    queue: {
+      add: async (name: string, data: unknown) => {
+        added.push({ name, data });
+        return { id: 'stub' };
+      },
+    } as unknown as Queue,
+  };
+}
+
 class StubContentPort extends DocumentContentPort {
   constructor(private readonly files: Record<string, DocumentContent>) {
     super();
@@ -66,6 +83,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
   let chunksService: DocumentChunksService;
   let acmeDocumentId: string;
   let rivalDocumentId: string;
+  const knowledgeQueue = stubKnowledgeQueue();
 
   beforeAll(async () => {
     dataSource = new DataSource({
@@ -103,6 +121,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
       new TextExtractionService(config, new OllamaVisionService(config)),
       new OllamaService(config),
       content,
+      knowledgeQueue.queue,
     );
 
     const acme = await documentsService.registerClientDocument({
@@ -153,6 +172,19 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
     const document = await documentsService.findById(acmeDocumentId);
     expect(document?.status).toBe(DocumentStatus.READY);
   }, 180000);
+
+  it('enfileira o estudo do documento depois de vetorizá-lo', () => {
+    expect(knowledgeQueue.added).toContainEqual({
+      name: 'study-document',
+      data: {
+        documentId: acmeDocumentId,
+        clientId: 'it-acme',
+        scopePath: SCOPE_PATH,
+        filename: 'plano.xlsx',
+        sha256: 'a'.repeat(64),
+      },
+    });
+  });
 
   it('grava o número da página junto do chunk', async () => {
     const rows = await dataSource.query(
@@ -235,6 +267,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
           mimeType: null,
         },
       }),
+      stubKnowledgeQueue().queue,
     );
 
     await expect(

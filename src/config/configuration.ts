@@ -48,11 +48,19 @@ export default () => ({
     embedBatchSize: parseInt(process.env.INGESTION_EMBED_BATCH_SIZE || '16', 10),
   },
 
+  knowledge: {
+    // O que o modelo lê de um documento para estudá-lo. Teto de caracteres, não
+    // de tokens: é o que o extrator sabe medir sem chamar o modelo.
+    excerptMaxChars: parseInt(process.env.KNOWLEDGE_EXCERPT_MAX_CHARS || '12000', 10),
+    studyTimeoutMs: parseInt(process.env.KNOWLEDGE_STUDY_TIMEOUT_MS || '180000', 10),
+  },
+
   queue: {
     concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '2', 10),
     // A ingestão é trabalho de lote e disputa a mesma GPU do chat interativo:
     // ela anda mais devagar de propósito, para não travar a resposta na tela.
     ingestionConcurrency: parseInt(process.env.INGESTION_QUEUE_CONCURRENCY || '1', 10),
+    knowledgeConcurrency: parseInt(process.env.KNOWLEDGE_QUEUE_CONCURRENCY || '1', 10),
     // Teto de duração TOTAL de uma resposta em streaming (não é timeout de inatividade).
     jobTimeoutMs: parseInt(process.env.QUEUE_JOB_TIMEOUT_MS || '300000', 10),
   },

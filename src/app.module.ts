@@ -10,6 +10,7 @@ import { OllamaModule } from './ollama/ollama.module';
 import { DocumentsModule } from './documents/documents.module';
 import { OrchestratorModule } from './orchestrator/orchestrator.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { HealthModule } from './health/health.module';
     DocumentsModule,
     OrchestratorModule,
     IngestionModule,
+    KnowledgeModule,
     HealthModule,
   ],
 })

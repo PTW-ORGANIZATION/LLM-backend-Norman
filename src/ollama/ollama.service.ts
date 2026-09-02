@@ -66,6 +66,54 @@ export class OllamaService {
     }
   }
 
+  /** O nome do modelo de texto configurado, que é o que identifica quem gerou uma nota. */
+  get textModel(): string {
+    return this.config.get<string>('ollama.model') as string;
+  }
+
+  /**
+   * Uma resposta em JSON, presa ao schema entregue ao modelo.
+   *
+   * `temperature: 0` porque o mesmo documento tem que produzir a mesma nota — o
+   * acervo é regerado por comparação, e resposta que muda a cada chamada faria
+   * qualquer comparação mentir. O schema vai no `format` do Ollama, mas o
+   * retorno **não** é confiável por isso: quem chama valida de novo.
+   */
+  async generateJson(input: {
+    prompt: string;
+    system?: string;
+    schema: unknown;
+    timeoutMs: number;
+  }): Promise<unknown> {
+    const host = this.config.get<string>('ollama.host');
+
+    const response = await fetch(`${host}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.textModel,
+        prompt: input.prompt,
+        system: input.system,
+        format: input.schema,
+        stream: false,
+        options: { temperature: 0 },
+      }),
+      signal: AbortSignal.timeout(input.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama /api/generate retornou ${response.status}`);
+    }
+
+    const data = (await response.json()) as { response?: string };
+
+    try {
+      return JSON.parse(data.response ?? '');
+    } catch {
+      throw new Error('Ollama /api/generate não devolveu JSON analisável');
+    }
+  }
+
   async embed(text: string): Promise<number[]> {
     const [embedding] = await this.embedBatch([text]);
     return embedding;

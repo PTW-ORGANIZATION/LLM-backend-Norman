@@ -116,6 +116,23 @@ export class DocumentChunksService {
   }
 
   /**
+   * O texto dos chunks de um documento, na ordem em que foi gravado.
+   *
+   * Só a coluna `content`: trazer a entity inteira arrastaria um `vector(768)`
+   * por chunk, que não serve para nada de quem vai ler o documento.
+   */
+  async contentForDocument(documentId: string): Promise<string[]> {
+    const rows = await this.documentChunksRepository
+      .createQueryBuilder('chunk')
+      .select('chunk.content', 'content')
+      .where('chunk.document_id = :documentId', { documentId })
+      .orderBy('chunk.chunk_index', 'ASC')
+      .getRawMany<{ content: string }>();
+
+    return rows.map((row) => row.content);
+  }
+
+  /**
    * Troca todos os chunks de um documento pelos novos, numa transação só.
    *
    * Reingerir um arquivo apaga o que havia antes: sem isso, uma segunda versão
