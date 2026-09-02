@@ -2,8 +2,9 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { InternalAuthGuard } from '../auth/internal-auth.guard';
 import { DocumentChunksService } from '../documents/document-chunks.service';
 import { OllamaService } from '../ollama/ollama.service';
+import { KnowledgeNoteKind } from '../knowledge/knowledge-note.entity';
 import { KnowledgeNotesService } from '../knowledge/knowledge-notes.service';
-import { KnowledgeSearchDto, ScopeStatusDto } from './internal-documents.dto';
+import { ClientDossierDto, KnowledgeSearchDto, ScopeStatusDto } from './internal-documents.dto';
 
 @UseGuards(InternalAuthGuard)
 @Controller('internal/knowledge')
@@ -42,5 +43,26 @@ export class InternalKnowledgeController {
   @Post('scope-status')
   async scopeStatus(@Body() dto: ScopeStatusDto) {
     return { documents: await this.knowledgeNotesService.listScopeStatus(dto) };
+  }
+
+  /**
+   * O dossiê consolidado de um cliente, ou nulo.
+   *
+   * Nulo é o caso normal de quem ainda não tem acervo estudado, e quem chama
+   * trata como "não há dossiê" — nunca como erro. Chaveado só pelo `clientId`:
+   * o dossiê é do cliente inteiro, e por isso consultá-lo não exige adivinhar a
+   * grafia da pasta.
+   */
+  @Post('dossier')
+  async dossier(@Body() dto: ClientDossierDto) {
+    const note = await this.knowledgeNotesService.findClientNote(
+      dto.clientId,
+      KnowledgeNoteKind.CLIENT_DOSSIER,
+    );
+
+    return {
+      dossier: note?.content ?? null,
+      updatedAt: note?.updatedAt ?? null,
+    };
   }
 }

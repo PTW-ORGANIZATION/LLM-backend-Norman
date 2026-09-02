@@ -99,6 +99,13 @@ export class RenamePrefixDto {
   toPath: string;
 }
 
+export class ClientDossierDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+}
+
 export class ScopeStatusDto {
   @IsString()
   @MinLength(1)
