@@ -5,7 +5,12 @@ import { InternalAuthGuard } from '../auth/internal-auth.guard';
 import { DocumentsService } from '../documents/documents.service';
 import { INGESTION_JOBS_QUEUE_NAME } from '../queue/queue.constants';
 import { IngestionJobData } from './ingestion-job-data.interface';
-import { RegisterDocumentDto } from './internal-documents.dto';
+import {
+  ForgetPathDto,
+  ForgetPrefixDto,
+  RegisterDocumentDto,
+  RenamePrefixDto,
+} from './internal-documents.dto';
 
 @UseGuards(InternalAuthGuard)
 @Controller('internal/documents')
@@ -61,6 +66,27 @@ export class InternalDocumentsController {
     );
 
     return { documentId: document.id, status: document.status, queued: true };
+  }
+
+  /** Esquece um arquivo que saiu do repositório do Norman. */
+  @Post('forget-path')
+  async forgetPath(@Body() dto: ForgetPathDto) {
+    return { removed: await this.documentsService.forgetPath(dto) };
+  }
+
+  /** Esquece uma pasta inteira do repositório do Norman, e tudo abaixo dela. */
+  @Post('forget-prefix')
+  async forgetPrefix(@Body() dto: ForgetPrefixDto) {
+    return { removed: await this.documentsService.forgetPrefix(dto) };
+  }
+
+  /**
+   * Move o acervo de uma pasta renomeada para o caminho novo. Não revetoriza: o
+   * embedding não depende de onde a pasta está.
+   */
+  @Post('rename-prefix')
+  async renamePrefix(@Body() dto: RenamePrefixDto) {
+    return { updated: await this.documentsService.renamePrefix(dto) };
   }
 
   @Get(':id')

@@ -53,3 +53,66 @@ export class RegisterDocumentDto {
   @Min(0)
   sizeBytes?: number;
 }
+
+export class ForgetPathDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'storagePath precisa ser um caminho simples, sem ".."' })
+  storagePath: string;
+}
+
+export class ForgetPrefixDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'scopePath precisa ser um caminho simples, sem ".."' })
+  scopePath: string;
+}
+
+export class RenamePrefixDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'fromPath precisa ser um caminho simples, sem ".."' })
+  fromPath: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'toPath precisa ser um caminho simples, sem ".."' })
+  toPath: string;
+}
+
+export class KnowledgeSearchDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'scopePath precisa ser um caminho simples, sem ".."' })
+  scopePath: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(4000)
+  question: string;
+}
