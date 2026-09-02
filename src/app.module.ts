@@ -10,6 +10,7 @@ import { OllamaModule } from './ollama/ollama.module';
 import { DocumentsModule } from './documents/documents.module';
 import { OrchestratorModule } from './orchestrator/orchestrator.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
     DocumentsModule,
     OrchestratorModule,
     IngestionModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
