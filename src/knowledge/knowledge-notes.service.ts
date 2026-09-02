@@ -5,6 +5,14 @@ import { DocumentRecord } from '../documents/document.entity';
 import { DocumentNoteRow } from './client-dossier';
 import { KnowledgeNote, KnowledgeNoteKind } from './knowledge-note.entity';
 
+export interface ScopeDocumentStatus {
+  storagePath: string;
+  filename: string;
+  status: string;
+  studied: boolean;
+  updatedAt: Date;
+}
+
 export interface SaveClientNoteInput {
   clientId: string;
   kind: KnowledgeNoteKind;
@@ -68,6 +76,40 @@ export class KnowledgeNotesService {
       .getRawMany<DocumentNoteRow>();
 
     return rows;
+  }
+
+  /**
+   * O estado de ingestão dos arquivos de uma pasta, para a tela do repositório.
+   *
+   * Compara `scope_path` por igualdade, não por prefixo: a tela mostra uma pasta,
+   * e nome de pasta do Norman é cheio de `_`, que é curinga no `LIKE` e traria a
+   * pasta irmã junto.
+   */
+  async listScopeStatus(input: {
+    clientId: string;
+    scopePath: string;
+    limit?: number;
+  }): Promise<ScopeDocumentStatus[]> {
+    return this.notesRepository.manager.query(
+      `SELECT d.storage_path AS "storagePath",
+              d.filename AS "filename",
+              d.status AS "status",
+              d.updated_at AS "updatedAt",
+              EXISTS (
+                SELECT 1 FROM knowledge_notes n
+                 WHERE n.document_id = d.id AND n.kind = $3
+              ) AS "studied"
+         FROM documents d
+        WHERE d.client_id = $1 AND d.scope_path = $2
+        ORDER BY d.filename
+        LIMIT $4`,
+      [
+        input.clientId,
+        input.scopePath,
+        KnowledgeNoteKind.DOCUMENT_SUMMARY,
+        Math.max(1, input.limit ?? 2000),
+      ],
+    );
   }
 
   async saveClientNote(input: SaveClientNoteInput): Promise<KnowledgeNote> {

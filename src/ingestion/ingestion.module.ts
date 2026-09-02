@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DocumentsModule } from '../documents/documents.module';
 import { OllamaModule } from '../ollama/ollama.module';
 import { QueueModule } from '../queue/queue.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { InternalDocumentsController } from './internal-documents.controller';
 import { InternalKnowledgeController } from './internal-knowledge.controller';
 import { IngestionProcessor } from './ingestion.processor';
@@ -10,7 +11,7 @@ import { DocumentContentPort } from './document-content.port';
 import { NormanDocumentContentAdapter } from './norman-document-content.adapter';
 
 @Module({
-  imports: [DocumentsModule, OllamaModule, QueueModule],
+  imports: [DocumentsModule, OllamaModule, QueueModule, KnowledgeModule],
   controllers: [InternalDocumentsController, InternalKnowledgeController],
   providers: [
     TextExtractionService,

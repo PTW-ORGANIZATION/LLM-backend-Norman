@@ -200,6 +200,27 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     expect(content.proibicoes.join(' ').toLowerCase()).toContain('logotipo');
   });
 
+  it('lista o estado de ingestão da pasta, com o que já foi estudado', async () => {
+    const documents = await notesService.listScopeStatus({
+      clientId: CLIENT_ID,
+      scopePath: SCOPE_PATH,
+    });
+
+    expect(documents).toEqual([
+      expect.objectContaining({
+        storagePath: `${SCOPE_PATH}/manual.pdf`,
+        filename: 'manual.pdf',
+        studied: true,
+      }),
+    ]);
+  });
+
+  it('a pasta de outro cliente não aparece no estado desta', async () => {
+    await expect(
+      notesService.listScopeStatus({ clientId: 'it-note-rival', scopePath: SCOPE_PATH }),
+    ).resolves.toEqual([]);
+  });
+
   it('consolida o dossiê do cliente a partir das notas gravadas', async () => {
     const result = (await processor.process(
       job(CONSOLIDATE_CLIENT_JOB, { clientId: CLIENT_ID }),

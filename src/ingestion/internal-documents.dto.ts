@@ -99,6 +99,19 @@ export class RenamePrefixDto {
   toPath: string;
 }
 
+export class ScopeStatusDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  clientId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  @Matches(SAFE_PATH, { message: 'scopePath precisa ser um caminho simples, sem ".."' })
+  scopePath: string;
+}
+
 export class KnowledgeSearchDto {
   @IsString()
   @MinLength(1)

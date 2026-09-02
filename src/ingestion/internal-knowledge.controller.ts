@@ -2,7 +2,8 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { InternalAuthGuard } from '../auth/internal-auth.guard';
 import { DocumentChunksService } from '../documents/document-chunks.service';
 import { OllamaService } from '../ollama/ollama.service';
-import { KnowledgeSearchDto } from './internal-documents.dto';
+import { KnowledgeNotesService } from '../knowledge/knowledge-notes.service';
+import { KnowledgeSearchDto, ScopeStatusDto } from './internal-documents.dto';
 
 @UseGuards(InternalAuthGuard)
 @Controller('internal/knowledge')
@@ -10,6 +11,7 @@ export class InternalKnowledgeController {
   constructor(
     private readonly documentChunksService: DocumentChunksService,
     private readonly ollamaService: OllamaService,
+    private readonly knowledgeNotesService: KnowledgeNotesService,
   ) {}
 
   /**
@@ -28,5 +30,17 @@ export class InternalKnowledgeController {
       embedding,
     });
     return { snippets };
+  }
+
+  /**
+   * O estado de ingestão de cada arquivo de uma pasta, para a tela do
+   * repositório do Norman mostrar ao lado do arquivo.
+   *
+   * Só a pasta pedida, sem descer: é o que a tela lista. Pasta sem nada ingerido
+   * devolve lista vazia, que a tela trata como "nada a mostrar".
+   */
+  @Post('scope-status')
+  async scopeStatus(@Body() dto: ScopeStatusDto) {
+    return { documents: await this.knowledgeNotesService.listScopeStatus(dto) };
   }
 }

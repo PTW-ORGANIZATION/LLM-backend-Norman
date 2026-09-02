@@ -1,13 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InternalKnowledgeController } from './internal-knowledge.controller';
 
-function buildController(snippets: Array<{ content: string }> = []) {
+function buildController(
+  snippets: Array<{ content: string }> = [],
+  scopeStatus: unknown[] = [],
+) {
   const chunksService = { searchSimilar: vi.fn(async () => snippets) } as any;
   const ollamaService = { embed: vi.fn(async () => [0.1, 0.2, 0.3]) } as any;
+  const notesService = { listScopeStatus: vi.fn(async () => scopeStatus) } as any;
   return {
-    controller: new InternalKnowledgeController(chunksService, ollamaService),
+    controller: new InternalKnowledgeController(chunksService, ollamaService, notesService),
     chunksService,
     ollamaService,
+    notesService,
   };
 }
 
@@ -44,5 +49,37 @@ describe('InternalKnowledgeController.search', () => {
 
     await expect(controller.search({ clientId: 'cli-1', scopePath: 'Vitalis', question: 'oi' }))
       .resolves.toEqual({ snippets: [] });
+  });
+});
+
+describe('InternalKnowledgeController.scopeStatus', () => {
+  it('devolve o estado de cada arquivo da pasta pedida', async () => {
+    const linha = {
+      storagePath: 'Vitalis/01_Brand/manual.pdf',
+      filename: 'manual.pdf',
+      status: 'ready',
+      studied: true,
+      updatedAt: new Date('2026-09-02T00:00:00Z'),
+    };
+    const { controller, notesService } = buildController([], [linha]);
+
+    const result = await controller.scopeStatus({
+      clientId: 'cli-1',
+      scopePath: 'Vitalis/01_Brand',
+    });
+
+    expect(notesService.listScopeStatus).toHaveBeenCalledWith({
+      clientId: 'cli-1',
+      scopePath: 'Vitalis/01_Brand',
+    });
+    expect(result).toEqual({ documents: [linha] });
+  });
+
+  it('pasta sem nada ingerido devolve lista vazia', async () => {
+    const { controller } = buildController();
+
+    await expect(
+      controller.scopeStatus({ clientId: 'cli-1', scopePath: 'Vitalis' }),
+    ).resolves.toEqual({ documents: [] });
   });
 });
