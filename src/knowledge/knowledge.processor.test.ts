@@ -411,7 +411,7 @@ describe('KnowledgeProcessor — dossiê do cliente', () => {
       {
         name: CONSOLIDATE_CLIENT_JOB,
         data: { clientId: 'cli-vitalis' },
-        opts: expect.objectContaining({ jobId: 'dossier:cli-vitalis', removeOnComplete: true }),
+        opts: expect.objectContaining({ jobId: 'dossier-cli-vitalis', removeOnComplete: true }),
       },
     ]);
   });

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Logger, Param, Post, UseGuards } from '@nestjs/common';
+import { ingestDocumentJobId } from '../queue/job-id';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -65,7 +66,7 @@ export class InternalDocumentsController {
         sha256: dto.sha256,
       },
       {
-        jobId: `${document.id}:${dto.sha256}`,
+        jobId: ingestDocumentJobId(document.id, dto.sha256),
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 1000,

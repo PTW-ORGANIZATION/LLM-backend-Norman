@@ -22,9 +22,10 @@ async function bootstrap() {
   app.enableCors({ origin: true, credentials: true });
 
   const port = config.get<number>('port') ?? 3000;
-  await app.listen(port);
+  const host = config.get<string>('host') ?? '0.0.0.0';
+  await app.listen(port, host);
   // eslint-disable-next-line no-console
-  console.log(`Backend rodando em http://127.0.0.1:${port}`);
+  console.log(`Backend rodando em http://${host}:${port}`);
 }
 
 bootstrap();

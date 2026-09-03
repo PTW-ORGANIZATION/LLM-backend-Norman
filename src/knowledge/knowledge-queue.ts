@@ -1,4 +1,5 @@
 import { Queue } from 'bullmq';
+import { clientDossierJobId, studyDocumentJobId } from '../queue/job-id';
 import {
   CONSOLIDATE_CLIENT_JOB,
   ConsolidateClientJobData,
@@ -18,7 +19,7 @@ export async function enqueueDocumentStudy(
   data: StudyDocumentJobData,
 ): Promise<void> {
   await queue.add(STUDY_DOCUMENT_JOB, data, {
-    jobId: `${data.documentId}:${data.sha256}`,
+    jobId: studyDocumentJobId(data.documentId, data.sha256),
     attempts: 3,
     backoff: { type: 'exponential', delay: 15000 },
     removeOnComplete: 1000,
@@ -43,7 +44,7 @@ export async function enqueueClientConsolidation(
   const data: ConsolidateClientJobData = { clientId };
 
   await queue.add(CONSOLIDATE_CLIENT_JOB, data, {
-    jobId: `dossier:${clientId}`,
+    jobId: clientDossierJobId(clientId),
     delay: delayMs,
     attempts: 3,
     backoff: { type: 'exponential', delay: 30000 },
