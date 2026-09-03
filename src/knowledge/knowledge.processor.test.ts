@@ -7,7 +7,7 @@ import { KnowledgeNotesService } from './knowledge-notes.service';
 import { ConsolidateResult, KnowledgeProcessor, StudyResult } from './knowledge.processor';
 import { NoteGenerationService } from './note-generation.service';
 import { BrandGuideNote, DocumentSummary, InvalidNoteContentError } from './note-content';
-import { ClientSynthesis, DocumentNoteRow } from './client-dossier';
+import { CLIENT_DOSSIER_VERSION, ClientSynthesis, DocumentNoteRow } from './client-dossier';
 import {
   CONSOLIDATE_CLIENT_JOB,
   KnowledgeJobData,
@@ -356,7 +356,7 @@ describe('KnowledgeProcessor — dossiê do cliente', () => {
       clientId: 'cli-vitalis',
       kind: KnowledgeNoteKind.CLIENT_DOSSIER,
       model: MODEL,
-      generatorVersion: 1,
+      generatorVersion: CLIENT_DOSSIER_VERSION,
     });
     expect(savedDossiers[0].content).toMatchObject({
       resumo: SYNTHESIS.resumo,
@@ -377,7 +377,7 @@ describe('KnowledgeProcessor — dossiê do cliente', () => {
       existingNotes: {
         [KnowledgeNoteKind.CLIENT_DOSSIER]: {
           model: MODEL,
-          generatorVersion: 1,
+          generatorVersion: CLIENT_DOSSIER_VERSION,
           sourceFingerprint: savedDossiers[0].sourceFingerprint as string,
         },
       },

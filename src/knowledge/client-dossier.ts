@@ -10,7 +10,7 @@ import {
   parseBrandGuideNote,
 } from './note-content';
 
-export const CLIENT_DOSSIER_VERSION = 1;
+export const CLIENT_DOSSIER_VERSION = 2;
 
 export interface ClientSynthesis {
   resumo: string;
@@ -54,6 +54,8 @@ export interface DossierDocument {
   pasta: string;
   tipo: string;
   resumo: string;
+  topicos: string[];
+  entidades: string[];
 }
 
 export interface ClientDossier {
@@ -130,6 +132,8 @@ export function dossierDocuments(
       pasta: note.scopePath ?? '',
       tipo: summary.tipo,
       resumo: summary.resumo,
+      topicos: summary.topicos,
+      entidades: summary.entidades,
     }));
 }
 

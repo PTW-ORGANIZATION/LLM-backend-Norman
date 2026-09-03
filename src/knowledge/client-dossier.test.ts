@@ -79,6 +79,8 @@ describe('dossierDocuments', () => {
       pasta: 'Vitalis/03_Campanhas',
       tipo: 'briefing',
       resumo: 'Campanha de verão com verba de 200 mil.',
+      topicos: ['verão'],
+      entidades: ['Vitalis'],
     });
   });
 
@@ -146,6 +148,8 @@ describe('buildClientCorpus', () => {
       pasta: 'Vitalis',
       tipo: 'briefing',
       resumo: 'x'.repeat(200),
+      topicos: [],
+      entidades: [],
     }));
 
     expect(buildClientCorpus(documents, 800).length).toBeLessThanOrEqual(800);
