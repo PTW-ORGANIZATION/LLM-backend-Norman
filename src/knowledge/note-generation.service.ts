@@ -44,7 +44,10 @@ export function buildDocumentSummaryPrompt(request: DocumentSummaryRequest): str
     '- idioma: o idioma predominante do documento, como "pt", "en" ou "es".',
     '- resumo: de duas a cinco frases sobre o que ele diz, com os números e prazos que aparecem.',
     '- topicos: os assuntos tratados, no vocabulário do próprio documento.',
-    '- entidades: marcas, produtos, praças e empresas citadas.',
+    '- entidades: marcas, produtos, praças e empresas citadas. NÃO inclua códigos nem frases-chave aqui.',
+    '- identificadores: códigos de campanha, slogans, frases-chave e qualquer identificador literal '
+      + 'do documento, copiados exatamente como aparecem, com a mesma grafia e pontuação. '
+      + 'É o que alguém pediria como "a frase-chave" ou "o código". Vazio se não houver.',
   ].join('\n');
 }
 

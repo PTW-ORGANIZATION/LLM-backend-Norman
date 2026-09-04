@@ -15,6 +15,7 @@ const VALID = {
   resumo: 'Define o tom de voz e a paleta da marca.',
   topicos: ['tom de voz', 'paleta'],
   entidades: ['AcmeCorp'],
+  identificadores: [],
 };
 
 describe('parseDocumentSummary', () => {
@@ -76,6 +77,7 @@ describe('parseDocumentSummary', () => {
       resumo: 'só o resumo',
       topicos: [],
       entidades: [],
+      identificadores: [],
     });
   });
 });
@@ -177,5 +179,34 @@ describe('noteNeedsRegeneration', () => {
     ['conteúdo de origem', { sourceFingerprint: 'b'.repeat(64) }],
   ])('%s diferente força a regeração', (_label, patch) => {
     expect(noteNeedsRegeneration({ ...target, ...patch }, target)).toBe(true);
+  });
+});
+
+describe('identificadores literais', () => {
+  const base = {
+    titulo: 'Guia',
+    tipo: 'Brand Guide',
+    idioma: 'pt',
+    resumo: 'Um resumo com o mínimo de duas frases. A segunda frase.',
+    topicos: ['marca'],
+    entidades: ['Selenita'],
+    identificadores: [],
+  };
+
+  it('separa identificador de entidade, sem adivinhar pela forma da string', () => {
+    const nota = parseDocumentSummary({ ...base, identificadores: ['ORQUIDEA CROMADA 47'] });
+    expect(nota.identificadores).toEqual(['ORQUIDEA CROMADA 47']);
+    expect(nota.entidades).toEqual(['Selenita']);
+  });
+
+  // O campo nasceu na versão 2. Nota gerada antes não o tem, e precisa continuar
+  // legível — a linha antiga serve até ser regerada.
+  it('nota da versão 1, sem o campo, vira lista vazia em vez de quebrar', () => {
+    expect(parseDocumentSummary(base).identificadores).toEqual([]);
+  });
+
+  it('aceita frase-chave em caixa normal, que a heurística antiga classificaria errado', () => {
+    const nota = parseDocumentSummary({ ...base, identificadores: ['Movimento que transforma'] });
+    expect(nota.identificadores).toEqual(['Movimento que transforma']);
   });
 });

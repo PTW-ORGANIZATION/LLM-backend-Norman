@@ -24,6 +24,7 @@ function summaryNote(overrides: Partial<DocumentNoteRow> = {}): DocumentNoteRow 
       resumo: 'Campanha de verão com verba de 200 mil.',
       topicos: ['verão'],
       entidades: ['Vitalis'],
+      identificadores: [],
     },
     ...overrides,
   };
@@ -81,6 +82,7 @@ describe('dossierDocuments', () => {
       resumo: 'Campanha de verão com verba de 200 mil.',
       topicos: ['verão'],
       entidades: ['Vitalis'],
+      identificadores: [],
     });
   });
 
@@ -150,6 +152,7 @@ describe('buildClientCorpus', () => {
       resumo: 'x'.repeat(200),
       topicos: [],
       entidades: [],
+      identificadores: [],
     }));
 
     expect(buildClientCorpus(documents, 800).length).toBeLessThanOrEqual(800);

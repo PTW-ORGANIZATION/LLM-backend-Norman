@@ -10,7 +10,7 @@ import {
   parseBrandGuideNote,
 } from './note-content';
 
-export const CLIENT_DOSSIER_VERSION = 2;
+export const CLIENT_DOSSIER_VERSION = 3;
 
 export interface ClientSynthesis {
   resumo: string;
@@ -56,6 +56,7 @@ export interface DossierDocument {
   resumo: string;
   topicos: string[];
   entidades: string[];
+  identificadores: string[];
 }
 
 export interface ClientDossier {
@@ -107,6 +108,7 @@ function summaryOf(note: DocumentNoteRow): DocumentSummary | null {
         resumo,
         topicos: asTextList(content.topicos, 12),
         entidades: asTextList(content.entidades, 20),
+        identificadores: asTextList(content.identificadores, 20),
       }
     : null;
 }
@@ -134,6 +136,7 @@ export function dossierDocuments(
       resumo: summary.resumo,
       topicos: summary.topicos,
       entidades: summary.entidades,
+      identificadores: summary.identificadores,
     }));
 }
 

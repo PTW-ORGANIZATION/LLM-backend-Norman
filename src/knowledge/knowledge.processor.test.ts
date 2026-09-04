@@ -8,6 +8,7 @@ import { ConsolidateResult, KnowledgeProcessor, StudyResult } from './knowledge.
 import { NoteGenerationService } from './note-generation.service';
 import { BrandGuideNote, DocumentSummary, InvalidNoteContentError } from './note-content';
 import { CLIENT_DOSSIER_VERSION, ClientSynthesis, DocumentNoteRow } from './client-dossier';
+import { DOCUMENT_SUMMARY_VERSION } from './note-content';
 import {
   CONSOLIDATE_CLIENT_JOB,
   KnowledgeJobData,
@@ -40,6 +41,7 @@ const SUMMARY: DocumentSummary = {
   resumo: 'Distribui a verba entre os canais.',
   topicos: ['verba'],
   entidades: ['Vitalis'],
+  identificadores: [],
 };
 
 const SYNTHESIS: ClientSynthesis = {
@@ -178,7 +180,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       scopePath: 'Vitalis/03_Campanhas',
       kind: KnowledgeNoteKind.DOCUMENT_SUMMARY,
       model: MODEL,
-      generatorVersion: 1,
+      generatorVersion: DOCUMENT_SUMMARY_VERSION,
       sourceFingerprint: SHA,
       content: SUMMARY,
     });
@@ -189,7 +191,7 @@ describe('KnowledgeProcessor — resumo por documento', () => {
       existingNotes: {
         [KnowledgeNoteKind.DOCUMENT_SUMMARY]: {
           model: MODEL,
-          generatorVersion: 1,
+          generatorVersion: DOCUMENT_SUMMARY_VERSION,
           sourceFingerprint: SHA,
         },
       },
@@ -204,9 +206,9 @@ describe('KnowledgeProcessor — resumo por documento', () => {
   });
 
   it.each([
-    ['o modelo mudou', { model: 'outro:7b', generatorVersion: 1, sourceFingerprint: SHA }],
-    ['o prompt mudou', { model: MODEL, generatorVersion: 0, sourceFingerprint: SHA }],
-    ['o arquivo mudou', { model: MODEL, generatorVersion: 1, sourceFingerprint: 'b'.repeat(64) }],
+    ['o modelo mudou', { model: 'outro:7b', generatorVersion: DOCUMENT_SUMMARY_VERSION, sourceFingerprint: SHA }],
+    ['o prompt mudou', { model: MODEL, generatorVersion: DOCUMENT_SUMMARY_VERSION - 1, sourceFingerprint: SHA }],
+    ['o arquivo mudou', { model: MODEL, generatorVersion: DOCUMENT_SUMMARY_VERSION, sourceFingerprint: 'b'.repeat(64) }],
   ])('regera a nota quando %s', async (_label, existing) => {
     const { processor, summarizeDocument } = buildProcessor({
       existingNotes: { [KnowledgeNoteKind.DOCUMENT_SUMMARY]: existing },
@@ -295,7 +297,7 @@ describe('KnowledgeProcessor — extração dirigida do brand guide', () => {
       existingNotes: {
         [KnowledgeNoteKind.DOCUMENT_SUMMARY]: {
           model: MODEL,
-          generatorVersion: 1,
+          generatorVersion: DOCUMENT_SUMMARY_VERSION,
           sourceFingerprint: SHA,
         },
       },
@@ -421,7 +423,7 @@ describe('KnowledgeProcessor — dossiê do cliente', () => {
       existingNotes: {
         [KnowledgeNoteKind.DOCUMENT_SUMMARY]: {
           model: MODEL,
-          generatorVersion: 1,
+          generatorVersion: DOCUMENT_SUMMARY_VERSION,
           sourceFingerprint: SHA,
         },
       },

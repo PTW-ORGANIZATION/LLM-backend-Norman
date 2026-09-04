@@ -58,7 +58,7 @@ describe('NoteGenerationService.summarizeDocument', () => {
     await service.summarizeDocument(REQUEST);
 
     expect(generateJson.mock.calls[0][0]).toMatchObject({
-      schema: { required: ['titulo', 'tipo', 'idioma', 'resumo', 'topicos', 'entidades'] },
+      schema: { required: ['titulo', 'tipo', 'idioma', 'resumo', 'topicos', 'entidades', 'identificadores'] },
     });
   });
 

@@ -7,6 +7,7 @@ export interface DocumentSummary {
   resumo: string;
   topicos: string[];
   entidades: string[];
+  identificadores: string[];
 }
 
 /**
@@ -16,7 +17,7 @@ export interface DocumentSummary {
  * o acervo como desatualizado sem apagar nada — a nota velha continua servindo
  * até ser regerada.
  */
-export const DOCUMENT_SUMMARY_VERSION = 1;
+export const DOCUMENT_SUMMARY_VERSION = 2;
 
 // Schema entregue ao Ollama em `format`. O modelo responde JSON que casa com
 // ele; o parser abaixo não confia nisso e valida de novo.
@@ -29,8 +30,9 @@ export const DOCUMENT_SUMMARY_SCHEMA = {
     resumo: { type: 'string' },
     topicos: { type: 'array', items: { type: 'string' } },
     entidades: { type: 'array', items: { type: 'string' } },
+    identificadores: { type: 'array', items: { type: 'string' } },
   },
-  required: ['titulo', 'tipo', 'idioma', 'resumo', 'topicos', 'entidades'],
+  required: ['titulo', 'tipo', 'idioma', 'resumo', 'topicos', 'entidades', 'identificadores'],
 } as const;
 
 const LIMITS = {
@@ -41,6 +43,7 @@ const LIMITS = {
   item: 200,
   topicos: 12,
   entidades: 20,
+  identificadores: 20,
 };
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -105,6 +108,7 @@ export function parseDocumentSummary(raw: unknown): DocumentSummary {
     resumo,
     topicos: asTextList(raw.topicos, LIMITS.topicos),
     entidades: asTextList(raw.entidades, LIMITS.entidades),
+    identificadores: asTextList(raw.identificadores, LIMITS.identificadores),
   };
 }
 
