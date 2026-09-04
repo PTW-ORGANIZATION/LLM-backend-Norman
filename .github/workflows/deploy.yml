@@ -13,6 +13,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npx vitest run
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -26,7 +40,7 @@ jobs:
 
             git pull origin main
 
-            cat > .env << 'ENVEOF'
+            cat > .env.novo << 'ENVEOF'
             NODE_ENV=production
             PORT=${{ secrets.PORT }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
@@ -43,10 +57,24 @@ jobs:
             OLLAMA_EMBEDDING_MODEL=${{ secrets.OLLAMA_EMBEDDING_MODEL }}
             QUEUE_CONCURRENCY=${{ secrets.QUEUE_CONCURRENCY }}
             QUEUE_JOB_TIMEOUT_MS=${{ secrets.QUEUE_JOB_TIMEOUT_MS }}
+            INTERNAL_API_TOKEN=${{ secrets.INTERNAL_API_TOKEN }}
+            NORMAN_INTERNAL_URL=${{ secrets.NORMAN_INTERNAL_URL }}
             ENVEOF
 
+            # O .env acima é reescrito inteiro a cada deploy. Toda chave que o
+            # serviço precisa tem que estar nele: o que faltar aqui é apagado do
+            # servidor sem aviso. Foi assim que INTERNAL_API_TOKEN e
+            # NORMAN_INTERNAL_URL sumiram em 03/09 e a ingestão parou.
+            # Valida no arquivo NOVO e só então substitui o que está em uso:
+            # secret faltando derruba o deploy sem encostar no .env do servidor.
+            for chave in DB_HOST DB_DATABASE REDIS_HOST OLLAMA_HOST INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
+              grep -qE "^${chave}=.+" .env.novo || { echo "::error::${chave} vazia — configure o secret no ambiente"; rm -f .env.novo; exit 1; }
+            done
+            mv .env.novo .env
+            chmod 600 .env
+
             mkdir -p logs
-            npm install
+            npm ci
             npm run build
             npm run migration:run
             pm2 restart llm-backend || pm2 start ecosystem.config.js --name llm-backend
