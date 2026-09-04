@@ -26,6 +26,11 @@ export default () => ({
     host: process.env.REDIS_HOST || '127.0.0.1',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD || undefined,
+    // Índice do banco do Redis. Duas instâncias do serviço no mesmo Redis com o
+    // mesmo índice compartilham as filas do BullMQ e roubam job uma da outra —
+    // a de produção buscaria no Norman de produção um arquivo que só existe no
+    // de develop. Um índice por ambiente separa as filas sem separar o Redis.
+    db: parseInt(process.env.REDIS_DB || '0', 10),
   },
 
   ollama: {
