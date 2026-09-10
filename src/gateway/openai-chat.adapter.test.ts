@@ -116,6 +116,72 @@ describe('OpenAiChatAdapter', () => {
     await expect(adapter.generate(CONEXAO, PEDIDO)).rejects.toMatchObject({ kind });
   });
 
+  it('a recusa carrega o que o provedor explicou, e não só o status', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+      text: async () => JSON.stringify({
+        error: 'The model `grok-4.6` does not exist or you do not have access to it.',
+      }),
+    }) as unknown as Response);
+    const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
+
+    await expect(adapter.generate(CONEXAO, PEDIDO)).rejects.toMatchObject({
+      kind: 'invalid_request',
+      message: expect.stringContaining('grok-4.6'),
+    });
+  });
+
+  it('não deixa a explicação do provedor carregar credencial', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+      text: async () => 'Authorization: Bearer xai-CHAVEDEVERDADE12345 foi recusada',
+    }) as unknown as Response);
+    const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
+
+    const falha = await adapter.generate(CONEXAO, PEDIDO).catch((erro: Error) => erro.message);
+
+    expect(falha).toContain('recusou a credencial');
+    expect(falha).not.toContain('xai-CHAVEDEVERDADE12345');
+  });
+
+  it('corpo vazio volta a dizer só o status', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+      text: async () => '   ',
+    }) as unknown as Response);
+    const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
+
+    await expect(adapter.generate(CONEXAO, PEDIDO)).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'o provedor respondeu 500',
+    });
+  });
+
+  it('a explicação também acompanha a recusa no streaming', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({}),
+      text: async () => 'model is required',
+    }) as unknown as Response);
+    const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
+
+    const consumir = async () => {
+      for await (const _evento of adapter.generateStream(CONEXAO, PEDIDO)) void _evento;
+    };
+
+    await expect(consumir()).rejects.toMatchObject({
+      kind: 'invalid_request',
+      message: expect.stringContaining('model is required'),
+    });
+  });
+
   it('resposta vazia é erro do provedor, e não texto vazio aceito', async () => {
     const fetchImpl = vi.fn(async () => respostaOk({ choices: [{ message: { content: '   ' } }] }));
     const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);

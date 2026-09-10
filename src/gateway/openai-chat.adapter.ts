@@ -21,20 +21,51 @@ interface ChatCompletionChunk {
 
 const STREAM_DONE = '[DONE]';
 
+const KEY_SHAPED = /\b(?:sk|xai|gsk|pk|key)[-_][A-Za-z0-9._-]{8,}/gi;
+const BEARER = /(bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi;
+const MAX_BODY_DETAIL = 200;
+
+/**
+ * O que o provedor disse, em forma segura de carregar num erro.
+ *
+ * Sem isto, a recusa mais comum — modelo inexistente — chegava como
+ * "o provedor recusou o pedido (404)" e não dizia qual modelo. O corpo é
+ * resposta de serviço externo, então vai redigido: nada com forma de chave
+ * atravessa para log, auditoria ou tela.
+ */
+function detailOf(body: string): string {
+  const texto = String(body || '')
+    .replace(/\s+/g, ' ')
+    .replace(BEARER, '$1***')
+    .replace(KEY_SHAPED, '***')
+    .trim();
+  if (!texto) return '';
+  return `: ${texto.slice(0, MAX_BODY_DETAIL)}`;
+}
+
 function failureFromStatus(status: number, body: string): ProviderFailure {
+  const detalhe = detailOf(body);
   if (status === 401 || status === 403) {
-    return new ProviderFailure('authorization', 'o provedor recusou a credencial', status);
+    return new ProviderFailure('authorization', `o provedor recusou a credencial${detalhe}`, status);
   }
   if (status === 400 || status === 404 || status === 422) {
-    return new ProviderFailure('invalid_request', `o provedor recusou o pedido (${status})`, status);
+    return new ProviderFailure(
+      'invalid_request',
+      `o provedor recusou o pedido (${status})${detalhe}`,
+      status,
+    );
   }
   if (status === 429) {
-    return new ProviderFailure('rate_limited', 'o provedor recusou por limite de uso', status);
+    return new ProviderFailure(
+      'rate_limited',
+      `o provedor recusou por limite de uso${detalhe}`,
+      status,
+    );
   }
   if (status >= 500) {
-    return new ProviderFailure('unavailable', `o provedor respondeu ${status}`, status);
+    return new ProviderFailure('unavailable', `o provedor respondeu ${status}${detalhe}`, status);
   }
-  return new ProviderFailure('provider_error', `o provedor respondeu ${status}: ${body.slice(0, 200)}`, status);
+  return new ProviderFailure('provider_error', `o provedor respondeu ${status}${detalhe}`, status);
 }
 
 /**

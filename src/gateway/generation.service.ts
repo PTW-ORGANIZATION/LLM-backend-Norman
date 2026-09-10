@@ -238,6 +238,7 @@ export class GenerationService {
           ? error
           : new ProviderFailure('provider_error', this.reasonOf(error));
         lastFailure = failure;
+        this.logFailure(dto, connection.key, currentModel, attempt, failure);
 
         const report: GenerationAttemptReport = {
           attempt,
@@ -691,6 +692,7 @@ export class GenerationService {
           ? error
           : new ProviderFailure('provider_error', this.reasonOf(error));
         lastFailure = failure;
+        this.logFailure(dto, connection.key, currentModel, attempt, failure);
 
         const report: GenerationAttemptReport = {
           attempt,
@@ -780,6 +782,30 @@ export class GenerationService {
     } catch (error) {
       this.logger.warn(`Não consegui registrar a execução: ${this.reasonOf(error)}`);
     }
+  }
+
+  /**
+   * A falha de uma tentativa, no log do serviço.
+   *
+   * A auditoria já grava `failure_reason`, mas ler o banco exige acesso que
+   * quem está diagnosticando um erro em tela normalmente não tem na hora. Sem
+   * esta linha, o único vestígio de "por que a geração falhou" ficava numa
+   * tabela, e a tela dizia apenas que algo inesperado aconteceu.
+   *
+   * `failure.message` já vem redigido de quem o construiu: o adapter redige o
+   * corpo do provedor antes de embrulhá-lo.
+   */
+  private logFailure(
+    dto: { feature: string; correlationId?: string },
+    connectionKey: string,
+    model: string,
+    attempt: number,
+    failure: ProviderFailure,
+  ): void {
+    this.logger.warn(
+      `Geração ${dto.feature} falhou na tentativa ${attempt} ` +
+        `[conexão=${connectionKey} modelo=${model} tipo=${failure.kind}]: ${failure.message}`,
+    );
   }
 
   private reasonOf(error: unknown): string {
