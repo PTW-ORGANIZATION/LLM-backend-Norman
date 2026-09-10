@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { OpenAiChatAdapter } from './openai-chat.adapter';
 import { ProviderFailure, type ProviderRequest } from './llm-provider.port';
 
@@ -19,6 +21,9 @@ const PEDIDO = {
   timeoutMs: 50,
 };
 
+@Module({ providers: [OpenAiChatAdapter] })
+class AdapterTestModule {}
+
 function respostaOk(overrides: Record<string, unknown> = {}) {
   return {
     ok: true,
@@ -33,6 +38,13 @@ function respostaOk(overrides: Record<string, unknown> = {}) {
 }
 
 describe('OpenAiChatAdapter', () => {
+  it('inicializa pelo container do Nest sem exigir um provider para fetch', async () => {
+    const module = await NestFactory.createApplicationContext(AdapterTestModule, { logger: false });
+
+    expect(module.get(OpenAiChatAdapter)).toBeInstanceOf(OpenAiChatAdapter);
+    await module.close();
+  });
+
   it('declara as capacidades em vez de deixar quem chama supor', () => {
     expect(new OpenAiChatAdapter().capabilities()).toEqual({
       streaming: true,

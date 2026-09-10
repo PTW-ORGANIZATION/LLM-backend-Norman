@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { ResolvedConnection } from './provider-connection';
 import {
   ProviderFailure,
@@ -49,7 +49,7 @@ function failureFromStatus(status: number, body: string): ProviderFailure {
 export class OpenAiChatAdapter implements LlmProvider {
   readonly protocol = 'openai_chat';
 
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(@Optional() private readonly fetchImpl: typeof fetch = fetch) {}
 
   capabilities(): ProviderCapabilities {
     return { streaming: true, structuredOutput: true, vision: false, cancellation: true };
