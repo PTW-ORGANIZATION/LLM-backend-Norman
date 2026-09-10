@@ -30,6 +30,105 @@ function layer(chunks: RetrievedChunk[], budget = BUDGET) {
   return applyRetrievalBudget(chunks, budget);
 }
 
+describe('mergeKnowledgeLayers — cota do acervo geral', () => {
+  function cinco(scope: 'client' | 'system', prefixo: string) {
+    return [0.9, 0.8, 0.7, 0.6, 0.5].map((similarity, indice) => chunk({
+      content: `${prefixo} ${indice}`,
+      similarity,
+      knowledgeScope: scope,
+      documentId: `${prefixo}-${indice}`,
+      storagePath: `${prefixo}/${indice}.pdf`,
+    }));
+  }
+
+  /**
+   * O defeito observado em 10/09/2026: o cliente devolvia cinco trechos, o
+   * teto da mesclagem também era cinco, e o acervo geral nunca entrava — a
+   * resposta afirmava que a informação não existia com o documento indexado,
+   * recuperado e acima do limiar.
+   */
+  it('o acervo geral entra mesmo quando o cliente preenche o orçamento', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente')),
+      system: layer(cinco('system', 'geral')),
+      budget: BUDGET,
+      systemAvailable: true,
+    });
+
+    const camadas = snippets.map((snippet) => snippet.knowledgeScope);
+    expect(snippets).toHaveLength(5);
+    expect(camadas.filter((camada) => camada === 'system')).toHaveLength(2);
+    expect(camadas.filter((camada) => camada === 'client')).toHaveLength(3);
+  });
+
+  it('o cliente continua vindo primeiro, e com a maior parte', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente')),
+      system: layer(cinco('system', 'geral')),
+      budget: BUDGET,
+      systemAvailable: true,
+    });
+
+    expect(snippets[0].knowledgeScope).toBe('client');
+    expect(snippets[1].knowledgeScope).toBe('client');
+    expect(snippets[2].knowledgeScope).toBe('client');
+  });
+
+  it('reserva não usada volta para o cliente, sem desperdiçar contexto', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente')),
+      system: null,
+      budget: BUDGET,
+      systemAvailable: true,
+    });
+
+    expect(snippets).toHaveLength(5);
+    expect(snippets.every((snippet) => snippet.knowledgeScope === 'client')).toBe(true);
+  });
+
+  it('com um trecho geral só, a reserva não passa do que existe', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente')),
+      system: layer([chunk({
+        content: 'geral unico',
+        similarity: 0.4,
+        knowledgeScope: 'system',
+        documentId: 'geral-unico',
+        storagePath: 'geral/unico.pdf',
+      })]),
+      budget: BUDGET,
+      systemAvailable: true,
+    });
+
+    expect(snippets).toHaveLength(5);
+    expect(snippets.filter((snippet) => snippet.knowledgeScope === 'system')).toHaveLength(1);
+  });
+
+  it('acervo geral retido continua fora, reserva ou não', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente')),
+      system: layer(cinco('system', 'geral')),
+      budget: BUDGET,
+      systemAvailable: false,
+    });
+
+    expect(snippets.every((snippet) => snippet.knowledgeScope === 'client')).toBe(true);
+  });
+
+  it('orçamento pequeno não deixa a reserva engolir o cliente', () => {
+    const { snippets } = mergeKnowledgeLayers({
+      client: layer(cinco('client', 'cliente'), { ...BUDGET, maxSnippets: 2 }),
+      system: layer(cinco('system', 'geral'), { ...BUDGET, maxSnippets: 2 }),
+      budget: { ...BUDGET, maxSnippets: 2 },
+      systemAvailable: true,
+    });
+
+    expect(snippets).toHaveLength(2);
+    expect(snippets.filter((s) => s.knowledgeScope === 'client')).toHaveLength(1);
+    expect(snippets.filter((s) => s.knowledgeScope === 'system')).toHaveLength(1);
+  });
+});
+
 describe('mergeKnowledgeLayers', () => {
   it('junta as duas camadas com o cliente na frente', () => {
     const merged = mergeKnowledgeLayers({
