@@ -28,6 +28,22 @@ describe('paridade dos prompts do gateway', () => {
     }
   });
 
+  /**
+   * O acervo geral é fonte de primeira classe, e não um anexo do acervo do
+   * cliente. Enquanto a exceção de escopo nomeava só o cliente, o modelo
+   * recuperava os trechos do acervo geral e recusava respondê-los por achar o
+   * tema alheio ao briefing — o documento estava no contexto e a resposta
+   * dizia que a informação não existia.
+   */
+  it('a conversa aceita o acervo geral como fonte, igual ao do cliente', () => {
+    expect(chat).toContain('acervo geral do sistema');
+    expect(chat).toContain('Nao recuse um fato por achar o tema alheio ao briefing');
+  });
+
+  it('a recusa fora de escopo continua valendo para o que não está no acervo', () => {
+    expect(chat).toContain('fora desse contexto e ausente do acervo');
+  });
+
   it('o marcador de conclusão continua sendo o que a tela lê', () => {
     expect(chat).toContain('BRIEFING_READY:');
   });
