@@ -55,6 +55,10 @@ jobs:
             OLLAMA_HOST=${{ secrets.OLLAMA_HOST }}
             OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
             OLLAMA_EMBEDDING_MODEL=${{ secrets.OLLAMA_EMBEDDING_MODEL }}
+            GROK_BASE_URL=${{ secrets.GROK_BASE_URL }}
+            GROK_API_KEY=${{ secrets.GROK_API_KEY }}
+            GROK_MODEL=${{ secrets.GROK_MODEL }}
+            GROK_ALLOWED_MODELS=${{ secrets.GROK_ALLOWED_MODELS }}
             QUEUE_CONCURRENCY=${{ secrets.QUEUE_CONCURRENCY }}
             QUEUE_JOB_TIMEOUT_MS=${{ secrets.QUEUE_JOB_TIMEOUT_MS }}
             REDIS_DB=${{ secrets.REDIS_DB }}
@@ -68,7 +72,7 @@ jobs:
             # NORMAN_INTERNAL_URL sumiram em 03/09 e a ingestão parou.
             # Valida no arquivo NOVO e só então substitui o que está em uso:
             # secret faltando derruba o deploy sem encostar no .env do servidor.
-            for chave in DB_HOST DB_DATABASE REDIS_HOST OLLAMA_HOST INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
+            for chave in DB_HOST DB_DATABASE REDIS_HOST OLLAMA_HOST GROK_BASE_URL GROK_API_KEY GROK_MODEL GROK_ALLOWED_MODELS INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
               grep -qE "^${chave}=.+" .env.novo || { echo "::error::${chave} vazia — configure o secret no ambiente"; rm -f .env.novo; exit 1; }
             done
             mv .env.novo .env
