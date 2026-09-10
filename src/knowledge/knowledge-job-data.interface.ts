@@ -6,7 +6,9 @@ export const CONSOLIDATE_CLIENT_JOB = 'consolidate-client';
 // dependência circular no grafo de módulos do Nest.
 export interface StudyDocumentJobData {
   documentId: string;
-  clientId: string;
+  /** O nível do acervo. Ausente vale `client`, nunca `system`. */
+  knowledgeScope?: 'system' | 'client';
+  clientId: string | null;
   scopePath: string;
   filename: string;
   sha256: string;

@@ -1,7 +1,15 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TextExtractionService } from './text-extraction.service';
-import { EmptyExtractionError, UnsupportedDocumentTypeError } from './extracted-text';
+import {
+  DocumentTooLargeError,
+  EmptyExtractionError,
+  MalformedDocumentError,
+  ProtectedDocumentError,
+  UnsupportedDocumentTypeError,
+} from './extracted-text';
 import { OllamaVisionService } from '../../ollama/ollama-vision.service';
 
 function buildPdf(pageTexts: Array<string | null>): Buffer {
@@ -227,5 +235,336 @@ describe('TextExtractionService — outros formatos', () => {
     await expect(
       service.extract({ content: Buffer.from('PK'), filename: 'acervo.zip' }),
     ).rejects.toBeInstanceOf(UnsupportedDocumentTypeError);
+  });
+});
+
+const FIXTURES = path.join(__dirname, '__fixtures__');
+
+function fixture(name: string): Buffer {
+  return fs.readFileSync(path.join(FIXTURES, name));
+}
+
+function serviceWith(
+  overrides: Record<string, unknown>,
+  transcribe?: () => Promise<string>,
+) {
+  const config = {
+    get: (key: string, fallback?: unknown) =>
+      overrides[key] ?? CONFIG_DEFAULTS[key] ?? fallback,
+  } as unknown as ConfigService;
+
+  const vision = {
+    transcribeImage: vi.fn(transcribe ?? (async () => '')),
+  } as unknown as OllamaVisionService;
+
+  return { service: new TextExtractionService(config, vision), vision };
+}
+
+/** Deck mínimo, porém estruturalmente válido, cujo único slide é uma imagem. */
+async function buildImageOnlyDeck(): Promise<Buffer> {
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  const relationships = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+  zip.file(
+    'ppt/presentation.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      `xmlns:r="${relationships}">` +
+      '<p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>',
+  );
+  zip.file(
+    'ppt/_rels/presentation.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      `<Relationship Id="rId1" Type="${relationships}/slide" Target="slides/slide1.xml"/>` +
+      '</Relationships>',
+  );
+  zip.file(
+    'ppt/slides/slide1.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+      `xmlns:r="${relationships}">` +
+      '<p:cSld><p:spTree><p:pic><p:blipFill><a:blip r:embed="rId2"/></p:blipFill></p:pic>' +
+      '</p:spTree></p:cSld></p:sld>',
+  );
+  zip.file(
+    'ppt/slides/_rels/slide1.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      `<Relationship Id="rId2" Type="${relationships}/image" Target="../media/image1.png"/>` +
+      '</Relationships>',
+  );
+  zip.file('ppt/media/image1.png', Buffer.from('89504e470d0a1a0a', 'hex'));
+
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
+describe('TextExtractionService — .doc legado', () => {
+  it('extrai o arquivo real e registra a origem', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.doc'),
+      filename: 'legado.doc',
+    });
+
+    expect(result.source).toBe('doc');
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].pageNumber).toBeNull();
+    expect(result.pages[0].text).toContain('ORQUIDEA CROMADA 47');
+    expect(result.pages[0].text).toContain('Cor primaria | azul-cobalto');
+  });
+
+  it('aceita extensão em maiúsculas e mime genérico do armazenamento', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.doc'),
+      filename: 'LEGADO.DOC',
+      mimeType: 'application/octet-stream',
+    });
+
+    expect(result.source).toBe('doc');
+  });
+
+  it('aceita o mime correto', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.doc'),
+      filename: 'legado.doc',
+      mimeType: 'application/msword',
+    });
+
+    expect(result.source).toBe('doc');
+  });
+
+  it('aceita nome com espaço e acento', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.doc'),
+      filename: 'Manual de Marca — Ação 2026.doc',
+    });
+
+    expect(result.source).toBe('doc');
+    expect(result.pages[0].text).toContain('ORQUIDEA CROMADA 47');
+  });
+
+  it('arquivo vazio é falha explícita, não sucesso vazio', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: Buffer.alloc(0), filename: 'vazio.doc' }),
+    ).rejects.toBeInstanceOf(MalformedDocumentError);
+  });
+
+  it('arquivo corrompido é falha explícita', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: fixture('legado.doc').subarray(0, 3000), filename: 'meio.doc' }),
+    ).rejects.toBeInstanceOf(MalformedDocumentError);
+  });
+});
+
+describe('TextExtractionService — .xls legado', () => {
+  it('produz uma unidade por aba e registra a origem', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'legado.xls',
+    });
+
+    expect(result.source).toBe('xls');
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2]);
+    expect(result.pages[0].text).toContain('# Midia');
+    expect(result.pages[0].text).toContain('Instagram | 15000');
+    expect(result.pages[0].text).toContain('2026-10-01');
+    expect(result.pages[0].text).toContain('Total | 23250.5');
+    expect(result.pages[1].text).toContain('# Cronograma');
+    expect(result.pages[1].text).toContain('ORQUIDEA CROMADA 47');
+  });
+
+  it('aceita extensão em maiúsculas e mime genérico do armazenamento', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'LEGADO.XLS',
+      mimeType: 'application/octet-stream',
+    });
+
+    expect(result.source).toBe('xls');
+    expect(result.pages).toHaveLength(2);
+  });
+
+  it('aceita o mime correto', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'legado.xls',
+      mimeType: 'application/vnd.ms-excel',
+    });
+
+    expect(result.source).toBe('xls');
+  });
+
+  it('aceita nome com espaço e acento', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'Verba de Mídia — Praças 2026.xls',
+    });
+
+    expect(result.source).toBe('xls');
+  });
+
+  it('respeita o teto de abas', async () => {
+    const { service } = serviceWith({ 'ingestion.maxSheets': 1 });
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'legado.xls',
+    });
+
+    expect(result.pages).toHaveLength(1);
+  });
+
+  it('arquivo vazio é falha explícita', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: Buffer.alloc(0), filename: 'vazio.xls' }),
+    ).rejects.toBeInstanceOf(MalformedDocumentError);
+  });
+
+  it('arquivo corrompido é falha explícita', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: Buffer.from('PK nao sou planilha'), filename: 'ruim.xls' }),
+    ).rejects.toBeInstanceOf(MalformedDocumentError);
+  });
+});
+
+describe('TextExtractionService — .pptx', () => {
+  it('produz uma unidade por slide, com título, tabela, gráfico e notas', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('apresentacao.pptx'),
+      filename: 'apresentacao.pptx',
+    });
+
+    expect(result.source).toBe('pptx');
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
+    expect(result.pages[0].text).toContain('Campanha Verao 2026');
+    expect(result.pages[0].text).toContain('Notas do apresentador');
+    expect(result.pages[1].text).toContain('Digital | 62 por cento');
+    expect(result.pages[2].text).toContain('Litoral Norte');
+  });
+
+  it('aceita extensão em maiúsculas e mime genérico do armazenamento', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('apresentacao.pptx'),
+      filename: 'APRESENTACAO.PPTX',
+      mimeType: 'application/octet-stream',
+    });
+
+    expect(result.source).toBe('pptx');
+  });
+
+  it('aceita o mime correto', async () => {
+    const { service } = makeService();
+    const result = await service.extract({
+      content: fixture('apresentacao.pptx'),
+      filename: 'apresentacao.pptx',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+
+    expect(result.source).toBe('pptx');
+  });
+
+  it('aplica OCR à imagem do slide sem texto e marca a origem', async () => {
+    const { service, vision } = serviceWith(
+      {},
+      async () => 'Arte do slide: promocao ORQUIDEA CROMADA 47 no litoral',
+    );
+    const result = await service.extract({
+      content: fixture('apresentacao.pptx'),
+      filename: 'apresentacao.pptx',
+    });
+
+    expect(result.source).toBe('pptx-ocr');
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2, 3, 4]);
+    expect(result.pages[3].text).toContain('Arte do slide');
+    expect(vision.transcribeImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('respeita o teto de imagens enviadas ao OCR', async () => {
+    const { service, vision } = serviceWith(
+      { 'ingestion.slideOcrMaxImages': 0 },
+      async () => 'nao deveria ser usado',
+    );
+    const result = await service.extract({
+      content: fixture('apresentacao.pptx'),
+      filename: 'apresentacao.pptx',
+    });
+
+    expect(vision.transcribeImage).not.toHaveBeenCalled();
+    expect(result.source).toBe('pptx');
+    expect(result.pages).toHaveLength(3);
+  });
+
+  it('deck feito só de imagem sem OCR aproveitável não entra vazio no acervo', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: await buildImageOnlyDeck(), filename: 'arte.pptx' }),
+    ).rejects.toBeInstanceOf(EmptyExtractionError);
+  });
+
+  it('deck feito só de imagem entra quando o OCR devolve texto', async () => {
+    const { service } = serviceWith({}, async () => 'Chamada da campanha lida da arte');
+    const result = await service.extract({
+      content: await buildImageOnlyDeck(),
+      filename: 'arte.pptx',
+    });
+
+    expect(result.source).toBe('pptx-ocr');
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].text).toContain('Chamada da campanha');
+  });
+
+  it('arquivo vazio é falha explícita', async () => {
+    const { service } = makeService();
+    await expect(
+      service.extract({ content: Buffer.alloc(0), filename: 'vazio.pptx' }),
+    ).rejects.toBeInstanceOf(MalformedDocumentError);
+  });
+
+  it('pacote cifrado é falha explícita de proteção', async () => {
+    const { service } = makeService();
+    const ole = Buffer.concat([
+      Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+      Buffer.alloc(512),
+    ]);
+
+    await expect(
+      service.extract({ content: ole, filename: 'protegido.pptx' }),
+    ).rejects.toBeInstanceOf(ProtectedDocumentError);
+  });
+});
+
+describe('TextExtractionService — teto de tamanho', () => {
+  it('recusa arquivo acima do limite antes de tentar interpretá-lo', async () => {
+    const { service } = serviceWith({ 'ingestion.maxFileBytes': 1024 });
+
+    await expect(
+      service.extract({ content: fixture('legado.xls'), filename: 'legado.xls' }),
+    ).rejects.toBeInstanceOf(DocumentTooLargeError);
+  });
+
+  it('aceita arquivo dentro do limite', async () => {
+    const { service } = serviceWith({ 'ingestion.maxFileBytes': 10485760 });
+    const result = await service.extract({
+      content: fixture('legado.xls'),
+      filename: 'legado.xls',
+    });
+
+    expect(result.source).toBe('xls');
   });
 });

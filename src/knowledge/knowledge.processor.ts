@@ -31,6 +31,7 @@ import {
   StudyDocumentJobData,
 } from './knowledge-job-data.interface';
 import { enqueueClientConsolidation } from './knowledge-queue';
+import { CLIENT_SCOPE, IngestionScope, SYSTEM_SCOPE } from '../documents/knowledge-scope';
 
 export interface StudyResult {
   documentId: string;
@@ -105,6 +106,10 @@ export class KnowledgeProcessor extends WorkerHost implements OnModuleInit {
   private async studyDocument(data: StudyDocumentJobData): Promise<StudyResult> {
     const model = this.noteGeneration.model;
     const planned = this.planFor(data);
+    // Job antigo, sem o nível no payload, é de cliente. Omissão nunca vale
+    // `system`: o acervo geral não existia antes desta versão.
+    const scope: IngestionScope = data.knowledgeScope === SYSTEM_SCOPE ? SYSTEM_SCOPE : CLIENT_SCOPE;
+    const clientId = scope === CLIENT_SCOPE ? String(data.clientId || '') : null;
 
     const pending: PlannedNote[] = [];
     for (const note of planned) {
@@ -148,7 +153,8 @@ export class KnowledgeProcessor extends WorkerHost implements OnModuleInit {
 
         await this.knowledgeNotesService.saveDocumentNote({
           documentId: data.documentId,
-          clientId: data.clientId,
+          scope,
+          clientId,
           scopePath: data.scopePath,
           kind: note.kind,
           model,
@@ -163,7 +169,12 @@ export class KnowledgeProcessor extends WorkerHost implements OnModuleInit {
     } finally {
       // O dossiê é refeito por causa do que já foi gravado, mesmo que a segunda
       // nota tenha falhado: o acervo mudou de qualquer jeito.
-      if (generated.length > 0) await this.scheduleConsolidation(data.clientId);
+      //
+      // O acervo geral do sistema não tem dossiê consolidado: o dossiê é o
+      // retrato de um cliente, e sintetizar "o sistema" produziria um resumo
+      // que nenhuma geração consulta. O que o acervo geral contribui são os
+      // trechos e as notas de documento dele.
+      if (generated.length > 0 && clientId) await this.scheduleConsolidation(clientId);
     }
 
     return { documentId: data.documentId, generated, skipped };

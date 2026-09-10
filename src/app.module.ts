@@ -12,6 +12,7 @@ import { OrchestratorModule } from './orchestrator/orchestrator.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { HealthModule } from './health/health.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { HealthModule } from './health/health.module';
     IngestionModule,
     KnowledgeModule,
     HealthModule,
+    GatewayModule,
   ],
 })
 export class AppModule {}

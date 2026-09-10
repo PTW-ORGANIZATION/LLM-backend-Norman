@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/migrations/*{.ts,.js}'],
+  migrations: [__dirname + '/migrations/[0-9]*{.ts,.js}'],
   synchronize: false, // NUNCA true em produção — sempre via migrations controladas
   logging: process.env.NODE_ENV === 'development',
 });

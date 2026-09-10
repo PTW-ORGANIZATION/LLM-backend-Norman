@@ -95,6 +95,7 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     );
 
     const { document } = await documentsService.registerClientDocument({
+      scope: 'client',
       clientId: CLIENT_ID,
       scopePath: SCOPE_PATH,
       storagePath: `${SCOPE_PATH}/manual.pdf`,
@@ -105,9 +106,12 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
 
     const embeddings = await ollama.embedBatch(PAGES);
     await chunksService.replaceForDocument({
+      scope: 'client',
       documentId,
       clientId: CLIENT_ID,
       scopePath: SCOPE_PATH,
+      embeddingModel: 'nomic-embed-text',
+      embeddingDimensions: 768,
       chunks: PAGES.map((content, index) => ({
         chunkIndex: index,
         pageNumber: index + 1,
@@ -255,6 +259,7 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     const { document } = await new DocumentsService(
       dataSource.getRepository(DocumentRecord),
     ).registerClientDocument({
+      scope: 'client',
       clientId: CLIENT_ID,
       scopePath: SCOPE_PATH,
       storagePath: `${SCOPE_PATH}/efemero.txt`,
@@ -263,6 +268,7 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     });
 
     await notesService.saveDocumentNote({
+      scope: 'client',
       documentId: document.id,
       clientId: CLIENT_ID,
       scopePath: SCOPE_PATH,

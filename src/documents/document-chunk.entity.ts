@@ -1,10 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { KnowledgeScopeKind } from './knowledge-scope';
 
 @Entity('document_chunks')
 @Index('idx_document_chunks_client_scope', ['clientId', 'scopePath'])
+@Index('idx_document_chunks_scope_level', ['knowledgeScope'])
 export class DocumentChunk {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /** O nível do acervo deste trecho. É por ele que a recuperação filtra. */
+  @Column({ name: 'knowledge_scope', type: 'varchar', length: 16 })
+  knowledgeScope: KnowledgeScopeKind;
 
   // Coluna simples (sem relation), como no resto do schema.
   @Column({ name: 'document_id', type: 'uuid' })
@@ -42,6 +48,13 @@ export class DocumentChunk {
   // isso geraria um DROP+ADD destrutivo num futuro migration:generate).
   @Column({ type: 'vector', length: 768 })
   embedding: number[];
+
+  @Index('idx_document_chunks_embedding_model')
+  @Column({ name: 'embedding_model', type: 'text', nullable: true })
+  embeddingModel: string | null;
+
+  @Column({ name: 'embedding_dimensions', type: 'int', nullable: true })
+  embeddingDimensions: number | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -28,6 +28,15 @@ const JOB_DATA: StudyDocumentJobData = {
   sha256: SHA,
 };
 
+const SYSTEM_JOB_DATA: StudyDocumentJobData = {
+  documentId: 'doc-geral',
+  knowledgeScope: 'system',
+  clientId: null,
+  scopePath: '_Conhecimento geral do sistema',
+  filename: 'tom-de-voz.pdf',
+  sha256: SHA,
+};
+
 const BRAND_JOB_DATA: StudyDocumentJobData = {
   ...JOB_DATA,
   scopePath: 'Vitalis/01_Brand_Guide_Institucional',
@@ -444,5 +453,50 @@ describe('KnowledgeProcessor — dossiê do cliente', () => {
 
     await expect(consolidate(processor)).rejects.toThrow(UnrecoverableError);
     expect(notesService.saveClientNote).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * O estudo de um documento do acervo geral do sistema.
+ *
+ * A nota nasce no nível geral, sem cliente, e nada de consolidação de cliente
+ * é agendado: o dossiê é o retrato de um cliente, e não existe cliente aqui.
+ */
+describe('KnowledgeProcessor no acervo geral do sistema', () => {
+  function job(data: StudyDocumentJobData) {
+    return { name: STUDY_DOCUMENT_JOB, data } as Job<KnowledgeJobData>;
+  }
+
+  it('grava a nota no nível geral, sem cliente', async () => {
+    const { processor, saved } = buildProcessor();
+
+    const result = (await processor.process(job(SYSTEM_JOB_DATA))) as StudyResult;
+
+    expect(result.generated).toEqual([KnowledgeNoteKind.DOCUMENT_SUMMARY]);
+    expect(saved[0]).toMatchObject({
+      documentId: 'doc-geral',
+      scope: 'system',
+      clientId: null,
+      scopePath: '_Conhecimento geral do sistema',
+    });
+  });
+
+  it('não agenda dossiê de cliente para o acervo geral', async () => {
+    const { processor, enqueued } = buildProcessor();
+
+    await processor.process(job(SYSTEM_JOB_DATA));
+
+    expect(enqueued).toEqual([]);
+  });
+
+  // Job antigo, enfileirado antes de o nível existir no payload, é de cliente:
+  // omissão nunca compartilha nada.
+  it('job sem nível declarado continua sendo de cliente', async () => {
+    const { processor, saved, enqueued } = buildProcessor();
+
+    await processor.process(job(JOB_DATA));
+
+    expect(saved[0]).toMatchObject({ scope: 'client', clientId: 'cli-vitalis' });
+    expect(enqueued.map((entry) => entry.name)).toEqual([CONSOLIDATE_CLIENT_JOB]);
   });
 });

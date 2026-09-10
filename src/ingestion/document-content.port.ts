@@ -5,9 +5,19 @@ export interface DocumentContent {
 }
 
 export interface DocumentContentRequest {
-  clientId: string;
+  /**
+   * O nível do acervo do arquivo pedido.
+   *
+   * Vai junto porque o Norman confere a propriedade antes de ler byte nenhum:
+   * caminho de cliente é conferido contra o cliente informado, e caminho do
+   * acervo geral é conferido contra o destino canônico do sistema. Sem o nível,
+   * um pedido sem cliente não teria contra o que ser conferido.
+   */
+  scope: 'system' | 'client';
+  clientId: string | null;
   storagePath: string;
   filename: string;
+  expectedSha256: string | null;
 }
 
 /**

@@ -35,15 +35,18 @@ export class NormanDocumentContentAdapter extends DocumentContentPort {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        clientId: request.clientId,
+        scope: request.scope,
+        ...(request.clientId ? { clientId: request.clientId } : {}),
         storagePath: request.storagePath,
+        ...(request.expectedSha256 ? { expectedSha256: request.expectedSha256 } : {}),
       }),
       signal: AbortSignal.timeout(this.config.get<number>('ingestion.fetchTimeoutMs', 120000)),
     });
 
     if (!response.ok) {
       throw new Error(
-        `Norman devolveu ${response.status} ao buscar "${request.storagePath}" do cliente ${request.clientId}`,
+        `Norman devolveu ${response.status} ao buscar "${request.storagePath}" no acervo `
+          + `${request.scope === 'system' ? 'geral do sistema' : `do cliente ${request.clientId}`}`,
       );
     }
 

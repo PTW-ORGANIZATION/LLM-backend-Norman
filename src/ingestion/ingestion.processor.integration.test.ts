@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DocumentChunk } from '../documents/document-chunk.entity';
 import { DocumentRecord, DocumentStatus } from '../documents/document.entity';
 import { DocumentChunksService } from '../documents/document-chunks.service';
+import { KnowledgeRevocation } from '../documents/knowledge-revocation.entity';
+import { RevocationsService } from '../documents/revocations.service';
 import { DocumentsService } from '../documents/documents.service';
 import { OllamaService } from '../ollama/ollama.service';
 import { OllamaVisionService } from '../ollama/ollama-vision.service';
@@ -81,6 +83,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
   let processor: IngestionProcessor;
   let documentsService: DocumentsService;
   let chunksService: DocumentChunksService;
+  let revocationsService: RevocationsService;
   let acmeDocumentId: string;
   let rivalDocumentId: string;
   const knowledgeQueue = stubKnowledgeQueue();
@@ -93,13 +96,14 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: DATABASE,
-      entities: [DocumentRecord, DocumentChunk],
+      entities: [DocumentRecord, DocumentChunk, KnowledgeRevocation],
       synchronize: false,
     });
     await dataSource.initialize();
 
     documentsService = new DocumentsService(dataSource.getRepository(DocumentRecord));
     chunksService = new DocumentChunksService(dataSource.getRepository(DocumentChunk));
+    revocationsService = new RevocationsService(dataSource.getRepository(KnowledgeRevocation));
 
     const content = new StubContentPort({
       'AcmeCorp/Campanhas/Verao2026/plano.xlsx': {
@@ -118,6 +122,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
       config,
       documentsService,
       chunksService,
+      revocationsService,
       new TextExtractionService(config, new OllamaVisionService(config)),
       new OllamaService(config),
       content,
@@ -125,6 +130,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
     );
 
     const acme = await documentsService.registerClientDocument({
+      scope: 'client',
       clientId: 'it-acme',
       scopePath: SCOPE_PATH,
       storagePath: 'AcmeCorp/Campanhas/Verao2026/plano.xlsx',
@@ -134,6 +140,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
     acmeDocumentId = acme.document.id;
 
     const rival = await documentsService.registerClientDocument({
+      scope: 'client',
       clientId: 'it-rival',
       scopePath: SCOPE_PATH,
       storagePath: 'AcmeCorp/Campanhas/Verao2026/segredo.md',
@@ -247,6 +254,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
 
   it('arquivo sem texto vira failed, não sucesso vazio', async () => {
     const vazio = await documentsService.registerClientDocument({
+      scope: 'client',
       clientId: 'it-acme',
       scopePath: SCOPE_PATH,
       storagePath: 'AcmeCorp/Campanhas/Verao2026/vazio.txt',
@@ -258,6 +266,7 @@ describeIntegration('IngestionProcessor contra banco e Ollama reais', () => {
       config,
       documentsService,
       chunksService,
+      revocationsService,
       new TextExtractionService(config, new OllamaVisionService(config)),
       new OllamaService(config),
       new StubContentPort({

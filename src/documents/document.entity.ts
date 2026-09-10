@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { KnowledgeScopeKind } from './knowledge-scope';
 
 export enum DocumentStatus {
   PENDING = 'pending',
@@ -23,9 +24,21 @@ export enum DocumentStatus {
 // o que a ingestão vinda do Norman preenche.
 @Entity('documents')
 @Index('idx_documents_client_scope', ['clientId', 'scopePath'])
+@Index('idx_documents_scope_level', ['knowledgeScope', 'scopePath'])
 export class DocumentRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * O nível do acervo a que este documento pertence.
+   *
+   * Coluna, e não dedução: `system` é o conhecimento geral do Norman e não tem
+   * `client_id`, então tratar a ausência dele como "compartilhe com todos"
+   * faria uma linha malformada virar acervo público. O CHECK
+   * `chk_documents_scope` exige o dono que cada nível requer.
+   */
+  @Column({ name: 'knowledge_scope', type: 'varchar', length: 16 })
+  knowledgeScope: KnowledgeScopeKind;
 
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;
@@ -61,6 +74,16 @@ export class DocumentRecord {
 
   @Column({ type: 'varchar', length: 50, default: DocumentStatus.PENDING })
   status: DocumentStatus;
+
+  // Qual extrator leu o arquivo. Nulo em documento ingerido antes da coluna
+  // existir, que não é a mesma coisa que documento sem texto.
+  @Column({ name: 'extraction_source', type: 'varchar', length: 50, nullable: true })
+  extractionSource: string | null;
+
+  // Motivo da última falha de ingestão, para a tela dizer o que fazer com o
+  // arquivo. Nulo quando o documento nunca falhou ou já foi lido com sucesso.
+  @Column({ name: 'failure_reason', type: 'text', nullable: true })
+  failureReason: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -4,12 +4,9 @@ import { DocumentChunk } from './document-chunk.entity';
 import { DocumentRecord } from './document.entity';
 import { DocumentChunksService } from './document-chunks.service';
 import { DocumentsService } from './documents.service';
+import { startIntegrationPostgres, type EmbeddedPostgres } from '../test/embedded-postgres';
+import { KNOWLEDGE_MIGRATIONS } from '../test/knowledge-migrations';
 
-// Roda contra um Postgres com pgvector de verdade. Fica de fora da suíte padrão
-// porque exige infraestrutura: só liga com INGESTION_IT_DATABASE apontando para
-// um banco DESCARTÁVEL — nunca o banco que serve produção.
-const DATABASE = process.env.INGESTION_IT_DATABASE;
-const describeIntegration = DATABASE ? describe : describe.skip;
 
 const CLIENT = 'it-scope-acme';
 const OTHER_CLIENT = 'it-scope-rival';
@@ -24,13 +21,15 @@ function embedding() {
   return Array.from({ length: 768 }, (_, index) => (index % 7) / 10);
 }
 
-describeIntegration('Manutenção de escopo contra Postgres real', () => {
+describe('Manutenção de escopo contra Postgres real', () => {
+  let embedded: EmbeddedPostgres;
   let dataSource: DataSource;
   let documentsService: DocumentsService;
   let chunksService: DocumentChunksService;
 
   async function seed(scopePath: string, storagePath: string, clientId = CLIENT) {
     const { document } = await documentsService.registerClientDocument({
+      scope: 'client',
       clientId,
       scopePath,
       storagePath,
@@ -38,9 +37,12 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
       sha256: 'c'.repeat(64),
     });
     await chunksService.replaceForDocument({
+      scope: 'client',
       documentId: document.id,
       clientId,
       scopePath,
+      embeddingModel: 'nomic-embed-text',
+      embeddingDimensions: 768,
       chunks: [{ chunkIndex: 0, pageNumber: 1, content: `conteudo de ${storagePath}`, embedding: embedding() }],
     });
     return document.id;
@@ -60,25 +62,23 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
   }
 
   beforeAll(async () => {
-    dataSource = new DataSource({
-      type: 'postgres',
-      host: process.env.DB_HOST || '127.0.0.1',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: DATABASE,
+    embedded = await startIntegrationPostgres({
       entities: [DocumentRecord, DocumentChunk],
-      synchronize: false,
+      migrations: KNOWLEDGE_MIGRATIONS,
     });
+    dataSource = new DataSource(embedded.options);
     await dataSource.initialize();
+    await dataSource.runMigrations();
     documentsService = new DocumentsService(dataSource.getRepository(DocumentRecord));
     chunksService = new DocumentChunksService(dataSource.getRepository(DocumentChunk));
-  }, 60000);
+  }, 120000);
 
   afterAll(async () => {
-    if (!dataSource?.isInitialized) return;
-    await wipe();
-    await dataSource.destroy();
+    if (dataSource?.isInitialized) {
+      await wipe();
+      await dataSource.destroy();
+    }
+    await embedded?.stop();
   });
 
   beforeEach(async () => {
@@ -90,6 +90,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     await seed(BRAND, `${BRAND}/manual.pdf`);
 
     const removed = await documentsService.forgetPath({
+      scope: 'client',
       clientId: CLIENT,
       storagePath: `${BRAND}/guia.pdf`,
     });
@@ -103,6 +104,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     await seed(BRAND, `${BRAND}/guia.pdf`, OTHER_CLIENT);
 
     const removed = await documentsService.forgetPath({
+      scope: 'client',
       clientId: CLIENT,
       storagePath: `${BRAND}/guia.pdf`,
     });
@@ -116,7 +118,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     await seed(CHILD, `${CHILD}/anexo.pdf`);
     await seed(SIBLING, `${SIBLING}/outro.pdf`);
 
-    const removed = await documentsService.forgetPrefix({ clientId: CLIENT, scopePath: BRAND });
+    const removed = await documentsService.forgetPrefix({ scope: 'client', clientId: CLIENT, scopePath: BRAND });
 
     expect(removed).toBe(2);
     expect(await scopes('documents')).toEqual([SIBLING]);
@@ -134,6 +136,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     );
 
     const updated = await documentsService.renamePrefix({
+      scope: 'client',
       clientId: CLIENT,
       fromPath: BRAND,
       toPath: 'Jonson___Co/01_Marca',
@@ -168,6 +171,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     await seed(BRAND, `${BRAND}/guia.pdf`, OTHER_CLIENT);
 
     const updated = await documentsService.renamePrefix({
+      scope: 'client',
       clientId: CLIENT,
       fromPath: BRAND,
       toPath: 'Jonson___Co/01_Marca',
@@ -181,6 +185,7 @@ describeIntegration('Manutenção de escopo contra Postgres real', () => {
     await seed(BRAND, `${BRAND}/guia.pdf`);
 
     await documentsService.renamePrefix({
+      scope: 'client',
       clientId: CLIENT,
       fromPath: BRAND,
       toPath: 'Jonson___Co/01_Marca',

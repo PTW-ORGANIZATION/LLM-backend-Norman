@@ -14,19 +14,48 @@ describe('detectDocumentKind', () => {
     expect(detectDocumentKind('notas.md')).toBe('plain');
   });
 
+  it('reconhece os formatos legados do Office', () => {
+    expect(detectDocumentKind('manual.doc')).toBe('doc');
+    expect(detectDocumentKind('verba.xls')).toBe('xls');
+    expect(detectDocumentKind('deck.pptx')).toBe('pptx');
+  });
+
+  it('reconhece extensão em maiúsculas', () => {
+    expect(detectDocumentKind('MANUAL.DOC')).toBe('doc');
+    expect(detectDocumentKind('VERBA.XLS')).toBe('xls');
+    expect(detectDocumentKind('DECK.PPTX')).toBe('pptx');
+  });
+
   it('prefere a extensão ao mime genérico do Drive e do Supabase', () => {
     expect(detectDocumentKind('briefing.docx', 'application/octet-stream')).toBe('docx');
+    expect(detectDocumentKind('manual.doc', 'application/octet-stream')).toBe('doc');
+    expect(detectDocumentKind('verba.xls', 'application/octet-stream')).toBe('xls');
+    expect(detectDocumentKind('deck.pptx', 'application/octet-stream')).toBe('pptx');
   });
 
   it('usa o mime quando o nome não tem extensão conhecida', () => {
     expect(detectDocumentKind('arquivo', 'application/pdf')).toBe('pdf');
     expect(detectDocumentKind('arquivo', 'text/plain; charset=utf-8')).toBe('plain');
+    expect(detectDocumentKind('arquivo', 'application/msword')).toBe('doc');
+    expect(detectDocumentKind('arquivo', 'application/vnd.ms-excel')).toBe('xls');
+    expect(
+      detectDocumentKind(
+        'arquivo',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ),
+    ).toBe('pptx');
   });
 
   it('recusa tipo que não sabe ler', () => {
     expect(() => detectDocumentKind('acervo.zip')).toThrow(UnsupportedDocumentTypeError);
     expect(() => detectDocumentKind('logo.png', 'image/png')).toThrow(UnsupportedDocumentTypeError);
-    expect(() => detectDocumentKind('legado.doc')).toThrow(UnsupportedDocumentTypeError);
+  });
+
+  it('recusa o .ppt binário, que está fora do escopo desta camada', () => {
+    expect(() => detectDocumentKind('antigo.ppt')).toThrow(UnsupportedDocumentTypeError);
+    expect(() => detectDocumentKind('antigo.ppt', 'application/vnd.ms-powerpoint')).toThrow(
+      UnsupportedDocumentTypeError,
+    );
   });
 });
 

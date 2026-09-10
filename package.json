@@ -11,7 +11,8 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:contract": "vitest run --config contract/vitest.config.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
@@ -25,10 +26,12 @@
     "@nestjs/typeorm": "^10.0.2",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.21.2",
+    "cfb": "^1.2.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "exceljs": "^4.4.0",
     "ioredis": "^5.4.1",
+    "jszip": "^3.10.1",
     "mammoth": "^1.12.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -37,10 +40,15 @@
     "pgvector": "^0.2.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "saxes": "^6.0.0",
     "typeorm": "^0.3.20",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "word-extractor": "^1.0.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
+    "@electric-sql/pglite-socket": "^0.2.11",
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@swc/core": "^1.16.1",
@@ -49,7 +57,6 @@
     "@types/node": "^22.9.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/uuid": "^10.0.0",
-    "jszip": "^3.10.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3",
     "unplugin-swc": "^1.5.11",
