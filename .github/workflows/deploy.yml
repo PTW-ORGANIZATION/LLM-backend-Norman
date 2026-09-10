@@ -80,7 +80,8 @@ jobs:
 
             mkdir -p logs
             npm ci
+            rm -rf dist
             npm run build
             npm run migration:run
-            pm2 restart llm-backend || pm2 start ecosystem.config.js --name llm-backend
+            pm2 startOrRestart ecosystem.config.js --only llm-backend --update-env
             pm2 save
