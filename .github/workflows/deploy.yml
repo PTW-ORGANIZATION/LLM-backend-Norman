@@ -84,4 +84,16 @@ jobs:
             npm run build
             npm run migration:run
             pm2 startOrRestart ecosystem.config.js --only llm-backend --update-env
+            healthy=false
+            for attempt in {1..15}; do
+              if curl --fail --silent --show-error "http://127.0.0.1:${{ secrets.PORT }}/health" >/dev/null; then
+                healthy=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$healthy" != true ]; then
+              pm2 logs llm-backend --lines 100 --nostream
+              exit 1
+            fi
             pm2 save
