@@ -43,6 +43,21 @@ const FORMATOS = [
 ] as const;
 
 /**
+ * O PDF fica fora da tabela de propósito.
+ *
+ * Ele tem um caso só, e não os três de cada formato legado: esta suíte sobe
+ * PostgreSQL embarcado e roda ao lado das outras suítes de integração, e cada
+ * ingestão a mais aproxima o conjunto do ponto em que uma delas falha por
+ * disputa de recurso, não por defeito. Um caminho completo basta para provar
+ * que o PDF atravessa extração, chunk, gravação e recuperação.
+ */
+const PDF = {
+  arquivo: 'guia-marca.pdf',
+  mimeType: 'application/pdf',
+  source: 'pdf-text-layer',
+} as const;
+
+/**
  * Embedding determinístico por texto.
  *
  * O Ollama não está disponível nesta suíte, e o que se mede aqui é o caminho do
@@ -178,6 +193,27 @@ describe('DOC, XLS e PPTX do upload à citação', () => {
       'legado.xls',
     ]);
   }, 120000);
+
+  it('o PDF atravessa extração, ingestão e recuperação com procedência', async () => {
+    const { documentId, extracted, chunks } = await ingest(PDF.arquivo, PDF.mimeType);
+
+    expect(extracted.source).toBe(PDF.source);
+    expect(extracted.pages.map((pagina) => pagina.text).join(' '))
+      .toContain('ORQUIDEA CROMADA 47');
+    expect(chunks.every((chunk) => typeof chunk.pageNumber === 'number')).toBe(true);
+
+    const [trecho] = await chunksService.searchSimilar({
+      scope: { kind: 'client', clientId: CLIENT, scopePath: SCOPE },
+      embedding: embeddingOf(chunks[0].content),
+      embeddingModel: 'nomic-embed-text',
+    });
+
+    expect(trecho).toMatchObject({
+      documentId,
+      filename: PDF.arquivo,
+      storagePath: `${SCOPE}/${PDF.arquivo}`,
+    });
+  }, 60000);
 
   it('formato legado não suportado falha em vez de entrar vazio no acervo', async () => {
     await expect(extraction.extract({

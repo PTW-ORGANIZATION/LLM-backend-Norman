@@ -193,7 +193,59 @@ def _png_solido():
     return io.BytesIO(png)
 
 
+PDF_LINHAS = [
+    "Guia de marca da Acme Corporation",
+    "O codigo de identificacao da marca e ORQUIDEA CROMADA 47.",
+    "A cor primaria e o azul profundo #12385A.",
+    "E proibido aplicar o logotipo sobre fundo vermelho.",
+]
+
+
+def gerar_pdf():
+    """Escreve um PDF de uma pagina com camada de texto, sem dependencia externa.
+
+    O arquivo existe para o teste em tela ter um PDF de verdade para enviar pelo
+    seletor de arquivos, e para a suite de formatos exercer o extrator de PDF
+    pelo mesmo caminho dos outros formatos.
+    """
+
+    conteudo = "BT /F1 12 Tf 72 760 Td 16 TL\n"
+    for linha in PDF_LINHAS:
+        conteudo += f"({linha}) Tj T*\n"
+    conteudo += "ET"
+
+    objetos = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        f"<< /Length {len(conteudo)} >>\nstream\n{conteudo}\nendstream",
+    ]
+
+    pdf = "%PDF-1.4\n"
+    deslocamentos = []
+    for numero, objeto in enumerate(objetos, start=1):
+        deslocamentos.append(len(pdf))
+        pdf += f"{numero} 0 obj\n{objeto}\nendobj\n"
+
+    inicio_xref = len(pdf)
+    pdf += f"xref\n0 {len(objetos) + 1}\n0000000000 65535 f \n"
+    for deslocamento in deslocamentos:
+        pdf += f"{deslocamento:010d} 00000 n \n"
+    pdf += (
+        f"trailer\n<< /Size {len(objetos) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{inicio_xref}\n%%EOF\n"
+    )
+
+    destino = os.path.join(AQUI, "guia-marca.pdf")
+    with open(destino, "wb") as arquivo:
+        arquivo.write(pdf.encode("latin-1"))
+    print(f"gerado: {destino}")
+
+
 if __name__ == "__main__":
     gerar_doc()
     gerar_xls()
     gerar_pptx()
+    gerar_pdf()

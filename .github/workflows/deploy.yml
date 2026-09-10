@@ -55,6 +55,8 @@ jobs:
             OLLAMA_HOST=${{ secrets.OLLAMA_HOST }}
             OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
             OLLAMA_EMBEDDING_MODEL=${{ secrets.OLLAMA_EMBEDDING_MODEL }}
+            OLLAMA_OPENAI_BASE_URL=${{ secrets.OLLAMA_OPENAI_BASE_URL }}
+            OLLAMA_ALLOWED_MODELS=${{ secrets.OLLAMA_ALLOWED_MODELS }}
             GROK_BASE_URL=${{ secrets.GROK_BASE_URL }}
             GROK_API_KEY=${{ secrets.GROK_API_KEY }}
             GROK_MODEL=${{ secrets.GROK_MODEL }}
@@ -69,7 +71,11 @@ jobs:
             # O .env acima é reescrito inteiro a cada deploy. Toda chave que o
             # serviço precisa tem que estar nele: o que faltar aqui é apagado do
             # servidor sem aviso. Foi assim que INTERNAL_API_TOKEN e
-            # NORMAN_INTERNAL_URL sumiram em 03/09 e a ingestão parou.
+            # NORMAN_INTERNAL_URL sumiram em 03/09 e a ingestão parou. A conexão
+            # ollama do gateway lê OLLAMA_OPENAI_BASE_URL, e não OLLAMA_HOST:
+            # sem ela o gateway assume 127.0.0.1 enquanto a ingestão fala com o
+            # host configurado, e os dois passam a apontar para lugares
+            # diferentes sem ninguém perceber.
             # Valida no arquivo NOVO e só então substitui o que está em uso:
             # secret faltando derruba o deploy sem encostar no .env do servidor.
             for chave in DB_HOST DB_DATABASE REDIS_HOST OLLAMA_HOST GROK_BASE_URL GROK_API_KEY GROK_MODEL GROK_ALLOWED_MODELS INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
