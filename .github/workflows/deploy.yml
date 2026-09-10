@@ -115,12 +115,24 @@ jobs:
             pm2 list
             ss -ltn 2>/dev/null | grep -E ':3000|:3001' || echo "sem ss disponivel"
             echo "::endgroup::"
+            # Em palavras, e não em código HTTP: há secret com valor "0" neste
+            # ambiente, então o GitHub mascara todo zero do log e "200" saía
+            # como "***". Palavra não colide com valor de secret.
             echo "::group::As rotas internas respondem?"
-            curl -s -o /dev/null -w "health: HTTP %{http_code}\n" \
-              "http://127.0.0.1:${{ secrets.PORT }}/health"
-            curl -s -o /dev/null -w "capabilities: HTTP %{http_code}\n" \
-              -H "x-internal-token: ${{ secrets.INTERNAL_API_TOKEN }}" \
-              "http://127.0.0.1:${{ secrets.PORT }}/internal/generation/capabilities"
+            for porta in ${{ secrets.PORT }} 3001; do
+              if curl -s --fail -o /dev/null "http://127.0.0.1:${porta}/health"; then
+                echo "porta ${porta}: /health responde"
+              else
+                echo "porta ${porta}: /health NAO responde"
+              fi
+              if curl -s --fail -o /dev/null \
+                -H "x-internal-token: ${{ secrets.INTERNAL_API_TOKEN }}" \
+                "http://127.0.0.1:${porta}/internal/generation/capabilities"; then
+                echo "porta ${porta}: capacidades do gateway respondem"
+              else
+                echo "porta ${porta}: capacidades do gateway NAO respondem (build sem gateway ou token recusado)"
+              fi
+            done
             echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \
