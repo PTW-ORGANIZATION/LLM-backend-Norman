@@ -145,6 +145,17 @@ jobs:
             curl -s "${{ secrets.OLLAMA_HOST }}/api/tags" \
               | tr ',' '\n' | grep -i '"name"' | head -20 || echo "nao consegui listar os modelos"
             echo "::endgroup::"
+            # Existir nao e o mesmo que funcionar. Este diagnostico manda os bytes
+            # de uma imagem versionada -- sempre a mesma -- para cada modelo e diz
+            # em palavras qual deles devolve o codigo escrito nela. Separa as tres
+            # causas de "nenhum texto extraido": modelo ausente, modelo que nao
+            # recebe a imagem, e modelo que recebe mas prefere a saida de
+            # emergencia do prompt a transcrever.
+            echo "::group::O modelo de visao consegue ler uma imagem?"
+            OLLAMA_HOST="${{ secrets.OLLAMA_HOST }}" \
+              node scripts/diagnostico-visao.mjs "${visao}" minicpm-v llava:7b \
+              || echo "o diagnostico de visao nao chegou ao fim"
+            echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \
               | grep -aiE "warn|error|falhou|recusou" | tail -30

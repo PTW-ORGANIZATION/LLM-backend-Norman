@@ -8,7 +8,7 @@ o conteudo esperado mudar, e nao como etapa de build.
 Uso (macOS, por causa do textutil que gera o .doc):
 
     python3 -m venv /tmp/fixgen
-    /tmp/fixgen/bin/pip install xlwt python-pptx
+    /tmp/fixgen/bin/pip install xlwt python-pptx pillow
     /tmp/fixgen/bin/python gerar-fixtures.py
 
 Os valores literais daqui sao os mesmos que os testes procuram. Mudar um texto
@@ -244,8 +244,61 @@ def gerar_pdf():
     print(f"gerado: {destino}")
 
 
+CODIGO_DA_IMAGEM = "TOPAZIO 8841"
+
+
+def gerar_png_com_texto():
+    """Um PNG com texto grande e legivel, para exercitar o modelo de visao.
+
+    E a unica fixture cuja extracao depende de um modelo externo: o texto so
+    entra no acervo se o modelo de visao conseguir le-lo. Por isso ela tambem e
+    o corpo do teste de fumaca do deploy, que manda estes bytes para cada modelo
+    instalado e diz qual deles devolve texto. Imagem fabricada na hora pelo
+    testador nao serve para isso: quando duas execucoes discordam, e preciso
+    saber que os bytes eram os mesmos.
+
+    Preto sobre branco, sem anti-aliasing exotico e sem canal alfa: o que houver
+    de falha aqui e do modelo, e nao da imagem.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    destino = os.path.join(AQUI, "imagem-com-texto.png")
+    linhas = ["CODIGO DE IMAGEM", CODIGO_DA_IMAGEM]
+
+    fonte_grande = None
+    for candidata in (
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ):
+        if os.path.exists(candidata):
+            fonte_grande = ImageFont.truetype(candidata, 96)
+            break
+
+    if fonte_grande is not None:
+        imagem = Image.new("RGB", (1000, 340), "white")
+        pincel = ImageDraw.Draw(imagem)
+        for indice, linha in enumerate(linhas):
+            caixa = pincel.textbbox((0, 0), linha, font=fonte_grande)
+            x = (imagem.width - (caixa[2] - caixa[0])) // 2
+            pincel.text((x, 40 + indice * 130), linha, fill="black", font=fonte_grande)
+    else:
+        # Sem fonte vetorial instalada: desenha pequeno com a fonte embutida e
+        # amplia sem suavizacao. Fica quadriculado, mas continua legivel -- o
+        # que importa e o CI conseguir regerar a fixture em qualquer maquina.
+        miniatura = Image.new("RGB", (125, 43), "white")
+        pincel = ImageDraw.Draw(miniatura)
+        for indice, linha in enumerate(linhas):
+            pincel.text((4, 6 + indice * 16), linha, fill="black")
+        imagem = miniatura.resize((1000, 344), Image.NEAREST)
+
+    imagem.save(destino, "PNG", optimize=True)
+    print("gerado", destino)
+
+
 if __name__ == "__main__":
     gerar_doc()
     gerar_xls()
     gerar_pptx()
     gerar_pdf()
+    gerar_png_com_texto()
