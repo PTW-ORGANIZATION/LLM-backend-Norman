@@ -55,7 +55,7 @@ export class TextExtractionService {
       );
     }
 
-    const extracted = await this.extractByKind(kind, input.content);
+    const extracted = await this.extractByKind(kind, input.content, input.filename);
     const pages = keepNonEmptyPages(extracted.pages);
 
     if (pages.length === 0) {
@@ -65,7 +65,11 @@ export class TextExtractionService {
     return { pages, source: extracted.source };
   }
 
-  private async extractByKind(kind: DocumentKind, content: Buffer): Promise<ExtractedDocument> {
+  private async extractByKind(
+    kind: DocumentKind,
+    content: Buffer,
+    filename: string,
+  ): Promise<ExtractedDocument> {
     if (kind === 'docx') {
       return { pages: await extractDocx(content), source: 'docx' };
     }
@@ -83,7 +87,7 @@ export class TextExtractionService {
       return this.extractPptx(content);
     }
     if (kind === 'image') {
-      return this.extractImage(content);
+      return this.extractImage(content, filename);
     }
     if (kind === 'plain') {
       return { pages: [{ pageNumber: null, text: content.toString('utf8') }], source: 'plain' };
@@ -199,12 +203,26 @@ export class TextExtractionService {
    * Imagem sem texto legível continua virando documento vazio, e quem chama a
    * recusa: foto de produto não é conhecimento.
    */
-  private async extractImage(content: Buffer): Promise<ExtractedDocument> {
-    const transcription = await this.vision.transcribeImage(content, {
+  private async extractImage(content: Buffer, filename: string): Promise<ExtractedDocument> {
+    const resultado = await this.vision.transcribeImageWithDiagnosis(content, {
       timeoutMs: this.config.get<number>('ingestion.ocrTimeoutMs', 180000),
     });
+
+    const texto = normalizeExtractedText(resultado.text);
+    if (!texto) {
+      // O diagnóstico vai na própria recusa, e não só no log do servidor: quem
+      // enviou a imagem vê a ficha administrativa, não o `pm2 logs`. Sem isto,
+      // imagem com texto e imagem sem texto falham com a mesma frase e não há
+      // como saber se o problema é o arquivo ou o modelo.
+      throw new EmptyExtractionError(
+        `${filename} — o modelo de visão "${resultado.model}" não devolveu texto `
+          + `(resposta de ${resultado.rawLength} caracteres, `
+          + `${resultado.sentinel ? 'declarou não haver texto legível' : 'sem declarar ausência de texto'})`,
+      );
+    }
+
     return {
-      pages: [{ pageNumber: null, text: normalizeExtractedText(transcription) }],
+      pages: [{ pageNumber: null, text: texto }],
       source: 'image-ocr',
     };
   }

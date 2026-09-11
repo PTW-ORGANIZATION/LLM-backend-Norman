@@ -105,8 +105,18 @@ function makeService(transcribe?: () => Promise<string>) {
     get: (key: string, fallback?: unknown) => CONFIG_DEFAULTS[key] ?? fallback,
   } as unknown as ConfigService;
 
+  const transcrever = transcribe ?? (async () => '');
   const vision = {
-    transcribeImage: vi.fn(transcribe ?? (async () => '')),
+    transcribeImage: vi.fn(transcrever),
+    transcribeImageWithDiagnosis: vi.fn(async (...args: any[]) => {
+      const text = await (transcrever as any)(...args);
+      return {
+        text,
+        model: 'modelo-de-teste',
+        rawLength: String(text ?? '').length,
+        sentinel: false,
+      };
+    }),
   } as unknown as OllamaVisionService;
 
   return { service: new TextExtractionService(config, vision), vision };
@@ -593,7 +603,21 @@ describe('TextExtractionService — imagem', () => {
     expect(extracted.pages).toHaveLength(1);
     expect(extracted.pages[0].pageNumber).toBeNull();
     expect(extracted.pages[0].text).toContain('ORQUIDEA 47');
-    expect(vision.transcribeImage).toHaveBeenCalledTimes(1);
+    expect((vision as any).transcribeImageWithDiagnosis).toHaveBeenCalledTimes(1);
+  });
+
+  it('a recusa diz qual modelo respondeu e o que ele devolveu', async () => {
+    const { service } = makeService(async () => '');
+
+    const erro = await service.extract({
+      content: PNG,
+      filename: 'sem-texto.png',
+      mimeType: 'image/png',
+    }).catch((e: Error) => e.message);
+
+    expect(erro).toContain('modelo de visão');
+    expect(erro).toContain('modelo-de-teste');
+    expect(erro).toContain('sem-texto.png');
   });
 
   it('imagem sem texto legível é recusada como documento vazio', async () => {

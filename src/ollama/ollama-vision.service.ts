@@ -48,6 +48,22 @@ export class OllamaVisionService {
    * imagem. Quem chama trata vazio como página sem conteúdo.
    */
   async transcribeImage(image: Buffer, opts: { timeoutMs: number }): Promise<string> {
+    return (await this.transcribeImageWithDiagnosis(image, opts)).text;
+  }
+
+  /**
+   * A mesma transcrição, com o que aconteceu quando ela vem vazia.
+   *
+   * Vazio tem três causas e consertos diferentes: o modelo não devolveu nada,
+   * o modelo respondeu o marcador de "sem texto", ou o limpador removeu tudo.
+   * Quem transcreve um arquivo de imagem inteiro precisa dizer qual delas foi —
+   * imagem com texto e imagem sem texto falhando com a mesma frase é
+   * indistinguível para quem está olhando a tela.
+   */
+  async transcribeImageWithDiagnosis(
+    image: Buffer,
+    opts: { timeoutMs: number },
+  ): Promise<{ text: string; model: string; rawLength: number; sentinel: boolean }> {
     const host = this.config.get<string>('ollama.host');
     const model = this.config.get<string>('ollama.visionModel');
 
@@ -77,13 +93,14 @@ export class OllamaVisionService {
     // sem visão responde para qualquer imagem, porque ele não vê nenhuma), ou
     // o limpador comeu tudo. Sem este registro, imagem com texto e imagem sem
     // texto falham com a mesma mensagem e não há como distingui-las.
+    const sentinel = bruto.toUpperCase().includes(NO_TEXT_SENTINEL);
     if (!limpo) {
       this.logger.warn(
         `Visão não devolveu texto [modelo=${model} bytes=${image.length} `
-          + `respostaCrua=${bruto.length} sentinela=${bruto.toUpperCase().includes(NO_TEXT_SENTINEL)}]`,
+          + `respostaCrua=${bruto.length} sentinela=${sentinel}]`,
       );
     }
 
-    return limpo;
+    return { text: limpo, model: String(model || ''), rawLength: bruto.length, sentinel };
   }
 }
