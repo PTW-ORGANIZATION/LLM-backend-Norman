@@ -82,6 +82,9 @@ export class TextExtractionService {
     if (kind === 'pptx') {
       return this.extractPptx(content);
     }
+    if (kind === 'image') {
+      return this.extractImage(content);
+    }
     if (kind === 'plain') {
       return { pages: [{ pageNumber: null, text: content.toString('utf8') }], source: 'plain' };
     }
@@ -182,6 +185,28 @@ export class TextExtractionService {
       );
       return '';
     }
+  }
+
+  /**
+   * O texto de um arquivo de imagem.
+   *
+   * A falha do modelo de visão **não** é engolida aqui, ao contrário do OCR de
+   * página de PDF e de imagem de slide: lá a imagem é uma melhoria de uma
+   * página, e perder uma não invalida o documento; aqui ela é o documento
+   * inteiro. Reportar "sem texto" quando o que houve foi o modelo não responder
+   * mandaria a pessoa procurar conteúdo onde o problema é de infraestrutura.
+   *
+   * Imagem sem texto legível continua virando documento vazio, e quem chama a
+   * recusa: foto de produto não é conhecimento.
+   */
+  private async extractImage(content: Buffer): Promise<ExtractedDocument> {
+    const transcription = await this.vision.transcribeImage(content, {
+      timeoutMs: this.config.get<number>('ingestion.ocrTimeoutMs', 180000),
+    });
+    return {
+      pages: [{ pageNumber: null, text: normalizeExtractedText(transcription) }],
+      source: 'image-ocr',
+    };
   }
 
   /**

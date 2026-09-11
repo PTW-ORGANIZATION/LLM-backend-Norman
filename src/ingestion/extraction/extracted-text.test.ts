@@ -48,7 +48,31 @@ describe('detectDocumentKind', () => {
 
   it('recusa tipo que não sabe ler', () => {
     expect(() => detectDocumentKind('acervo.zip')).toThrow(UnsupportedDocumentTypeError);
-    expect(() => detectDocumentKind('logo.png', 'image/png')).toThrow(UnsupportedDocumentTypeError);
+    expect(() => detectDocumentKind('desenho.svg', 'image/svg+xml')).toThrow(
+      UnsupportedDocumentTypeError,
+    );
+  });
+
+  /**
+   * Imagem passou a ser lida pelo modelo de visão. Só os formatos que o
+   * provedor aceita entram: anunciar um que ele recusa é pedir um arquivo que
+   * nunca vai ser estudado.
+   */
+  it.each(['foto.png', 'foto.jpg', 'foto.jpeg', 'foto.webp'])('lê %s como imagem', (nome) => {
+    expect(detectDocumentKind(nome)).toBe('image');
+  });
+
+  it.each(['image/png', 'image/jpeg', 'image/webp'])('lê o mime %s como imagem', (mime) => {
+    expect(detectDocumentKind('arquivo-sem-extensao', mime)).toBe('image');
+  });
+
+  it('formato de imagem fora da lista continua recusado', () => {
+    expect(() => detectDocumentKind('antigo.bmp', 'image/bmp')).toThrow(
+      UnsupportedDocumentTypeError,
+    );
+    expect(() => detectDocumentKind('scan.tiff', 'image/tiff')).toThrow(
+      UnsupportedDocumentTypeError,
+    );
   });
 
   it('recusa o .ppt binário, que está fora do escopo desta camada', () => {

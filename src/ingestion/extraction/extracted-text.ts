@@ -7,6 +7,7 @@ export type ExtractionSource =
   | 'xls'
   | 'pptx'
   | 'pptx-ocr'
+  | 'image-ocr'
   | 'plain';
 
 export interface ExtractedPage {
@@ -20,7 +21,15 @@ export interface ExtractedDocument {
   source: ExtractionSource;
 }
 
-export type DocumentKind = 'pdf' | 'docx' | 'doc' | 'xlsx' | 'xls' | 'pptx' | 'plain';
+export type DocumentKind =
+  | 'pdf'
+  | 'docx'
+  | 'doc'
+  | 'xlsx'
+  | 'xls'
+  | 'pptx'
+  | 'image'
+  | 'plain';
 
 /** Tipo de arquivo que a camada de extração não sabe ler. Não é falha de conteúdo. */
 export class UnsupportedDocumentTypeError extends Error {
@@ -89,6 +98,13 @@ const EXTENSION_KINDS: Record<string, DocumentKind> = {
   html: 'plain',
   htm: 'plain',
   log: 'plain',
+  // Imagem entra pelo modelo de visão, que devolve o texto visível dela. Só os
+  // formatos que o provedor de visão aceita: anunciar um que ele recusa é
+  // pedir um arquivo que nunca vai ser estudado.
+  png: 'image',
+  jpg: 'image',
+  jpeg: 'image',
+  webp: 'image',
 };
 
 const MIME_KINDS: Record<string, DocumentKind> = {
@@ -101,6 +117,9 @@ const MIME_KINDS: Record<string, DocumentKind> = {
   'application/vnd.ms-excel.sheet.macroEnabled.12': 'xlsx',
   'application/vnd.ms-excel': 'xls',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'image/png': 'image',
+  'image/jpeg': 'image',
+  'image/webp': 'image',
 };
 
 /**

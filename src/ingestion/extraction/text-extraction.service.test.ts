@@ -568,3 +568,65 @@ describe('TextExtractionService — teto de tamanho', () => {
     expect(result.source).toBe('xls');
   });
 });
+
+/**
+ * Arquivo de imagem passou a entrar no acervo pelo modelo de visão.
+ *
+ * O que importa aqui é a diferença de tratamento em relação ao OCR de página:
+ * numa página de PDF a imagem é melhoria e a falha é engolida; num arquivo de
+ * imagem ela é o documento inteiro, e engolir a falha reportaria "sem texto"
+ * quando o problema é o modelo não ter respondido.
+ */
+describe('TextExtractionService — imagem', () => {
+  const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
+
+  it('transcreve a imagem e marca a origem', async () => {
+    const { service, vision } = makeService(async () => 'CODIGO DA PECA: ORQUIDEA 47');
+
+    const extracted = await service.extract({
+      content: PNG,
+      filename: 'peca.png',
+      mimeType: 'image/png',
+    });
+
+    expect(extracted.source).toBe('image-ocr');
+    expect(extracted.pages).toHaveLength(1);
+    expect(extracted.pages[0].pageNumber).toBeNull();
+    expect(extracted.pages[0].text).toContain('ORQUIDEA 47');
+    expect(vision.transcribeImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('imagem sem texto legível é recusada como documento vazio', async () => {
+    const { service } = makeService(async () => '   ');
+
+    await expect(service.extract({
+      content: PNG,
+      filename: 'foto-de-produto.png',
+      mimeType: 'image/png',
+    })).rejects.toBeInstanceOf(EmptyExtractionError);
+  });
+
+  it('falha do modelo de visão sobe como erro, e não como documento vazio', async () => {
+    const { service } = makeService(async () => {
+      throw new Error('Ollama /api/generate (visão) retornou 500');
+    });
+
+    await expect(service.extract({
+      content: PNG,
+      filename: 'peca.png',
+      mimeType: 'image/png',
+    })).rejects.toThrow('retornou 500');
+  });
+
+  it('o jpeg passa pelo mesmo caminho', async () => {
+    const { service } = makeService(async () => 'texto da arte');
+
+    const extracted = await service.extract({
+      content: PNG,
+      filename: 'arte.jpg',
+      mimeType: 'image/jpeg',
+    });
+
+    expect(extracted.source).toBe('image-ocr');
+  });
+});
