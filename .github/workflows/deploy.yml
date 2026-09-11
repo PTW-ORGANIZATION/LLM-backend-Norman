@@ -55,6 +55,7 @@ jobs:
             OLLAMA_HOST=${{ secrets.OLLAMA_HOST }}
             OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
             OLLAMA_EMBEDDING_MODEL=${{ secrets.OLLAMA_EMBEDDING_MODEL }}
+            OLLAMA_VISION_MODEL=${{ secrets.OLLAMA_VISION_MODEL }}
             OLLAMA_OPENAI_BASE_URL=${{ secrets.OLLAMA_OPENAI_BASE_URL }}
             OLLAMA_ALLOWED_MODELS=${{ secrets.OLLAMA_ALLOWED_MODELS }}
             GROK_BASE_URL=${{ secrets.GROK_BASE_URL }}
@@ -133,6 +134,16 @@ jobs:
                 echo "porta ${porta}: capacidades do gateway NAO respondem (build sem gateway ou token recusado)"
               fi
             done
+            echo "::endgroup::"
+            # O modelo de visão existe neste Ollama? Ele é lido de
+            # OLLAMA_VISION_MODEL e cai num padrão quando a variável não vem.
+            # Modelo ausente ou sem visão faz toda imagem falhar com "nenhum
+            # texto extraído", igual para imagem com e sem texto.
+            echo "::group::Modelo de visão"
+            visao="${{ secrets.OLLAMA_VISION_MODEL }}"
+            echo "configurado: ${visao:-<vazio, usando o padrao do codigo>}"
+            curl -s "${{ secrets.OLLAMA_HOST }}/api/tags" \
+              | tr ',' '\n' | grep -i '"name"' | head -20 || echo "nao consegui listar os modelos"
             echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \

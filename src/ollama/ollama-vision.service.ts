@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 const TRANSCRIPTION_PROMPT = [
@@ -37,6 +37,8 @@ export function cleanTranscription(raw: string): string {
 
 @Injectable()
 export class OllamaVisionService {
+  private readonly logger = new Logger(OllamaVisionService.name);
+
   constructor(private readonly config: ConfigService) {}
 
   /**
@@ -67,6 +69,21 @@ export class OllamaVisionService {
     }
 
     const data = (await response.json()) as { response?: string };
-    return cleanTranscription(data.response ?? '');
+    const bruto = data.response ?? '';
+    const limpo = cleanTranscription(bruto);
+
+    // Transcrição vazia tem três causas que exigem consertos diferentes: o
+    // modelo não devolveu nada, o modelo disse NENHUM_TEXTO (o que um modelo
+    // sem visão responde para qualquer imagem, porque ele não vê nenhuma), ou
+    // o limpador comeu tudo. Sem este registro, imagem com texto e imagem sem
+    // texto falham com a mesma mensagem e não há como distingui-las.
+    if (!limpo) {
+      this.logger.warn(
+        `Visão não devolveu texto [modelo=${model} bytes=${image.length} `
+          + `respostaCrua=${bruto.length} sentinela=${bruto.toUpperCase().includes(NO_TEXT_SENTINEL)}]`,
+      );
+    }
+
+    return limpo;
   }
 }
