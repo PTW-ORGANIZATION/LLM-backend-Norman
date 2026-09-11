@@ -296,9 +296,27 @@ def gerar_png_com_texto():
     print("gerado", destino)
 
 
+def gerar_png_sem_texto():
+    """Um PNG sem palavra nenhuma, para provar que a recusa ainda recusa.
+
+    E o par da imagem com texto. Sozinha, a imagem legivel so prova metade:
+    um prompt que transcreve tudo e nunca recusa nada faria foto de produto
+    virar conhecimento vazio. As duas juntas prendem os dois lados.
+
+    Cor solida e sem ruido de proposito -- nada aqui que um modelo possa
+    confundir com letra.
+    """
+    from PIL import Image
+
+    destino = os.path.join(AQUI, "imagem-sem-texto.png")
+    Image.new("RGB", (1000, 340), (86, 124, 168)).save(destino, "PNG", optimize=True)
+    print("gerado", destino)
+
+
 if __name__ == "__main__":
     gerar_doc()
     gerar_xls()
     gerar_pptx()
     gerar_pdf()
     gerar_png_com_texto()
+    gerar_png_sem_texto()

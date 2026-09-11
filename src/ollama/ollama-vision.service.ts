@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-const TRANSCRIPTION_PROMPT = [
-  'Transcreva literalmente todo o texto visível nesta imagem.',
-  'Não descreva a imagem, não traduza e não resuma.',
-  'Não adicione títulos, rótulos, marcadores nem comentários seus.',
-  'Se não houver nenhum texto legível, responda exatamente NENHUM_TEXTO.',
-].join(' ');
-
-const NO_TEXT_SENTINEL = 'NENHUM_TEXTO';
+import {
+  TRANSCRIPTION_PROMPT,
+  declarouAusenciaDeTexto,
+  removerSentinela,
+} from './vision-prompt';
 
 /**
  * Tira do retorno do modelo o enfeite que ele insiste em acrescentar mesmo
@@ -20,7 +17,7 @@ const NO_TEXT_SENTINEL = 'NENHUM_TEXTO';
  * um chunk com a descrição do papel em branco.
  */
 export function cleanTranscription(raw: string): string {
-  const withoutSentinel = String(raw || '').replace(new RegExp(NO_TEXT_SENTINEL, 'gi'), '');
+  const withoutSentinel = removerSentinela(raw);
 
   const lines = withoutSentinel
     .replace(/\*\*/g, '')
@@ -89,11 +86,11 @@ export class OllamaVisionService {
     const limpo = cleanTranscription(bruto);
 
     // Transcrição vazia tem três causas que exigem consertos diferentes: o
-    // modelo não devolveu nada, o modelo disse NENHUM_TEXTO (o que um modelo
-    // sem visão responde para qualquer imagem, porque ele não vê nenhuma), ou
-    // o limpador comeu tudo. Sem este registro, imagem com texto e imagem sem
-    // texto falham com a mesma mensagem e não há como distingui-las.
-    const sentinel = bruto.toUpperCase().includes(NO_TEXT_SENTINEL);
+    // modelo não devolveu nada, o modelo declarou que a imagem não tem texto,
+    // ou o limpador comeu tudo. Sem este registro, imagem com texto e imagem
+    // sem texto falham com a mesma mensagem e não há como distingui-las — foi
+    // o que escondeu, por um dia inteiro, que o culpado era o prompt.
+    const sentinel = declarouAusenciaDeTexto(bruto);
     if (!limpo) {
       this.logger.warn(
         `Visão não devolveu texto [modelo=${model} bytes=${image.length} `

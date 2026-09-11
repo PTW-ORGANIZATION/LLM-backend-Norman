@@ -1,80 +1,92 @@
 #!/usr/bin/env node
 /**
- * Diz, em palavras, se o modelo de visao consegue ler uma imagem.
+ * Diz, em palavras, se o modelo de visao esta lendo as imagens -- e se o
+ * prompt de producao deixa ele transcrever o que leu.
  *
- * Existe porque "nenhum texto extraido" tem causas que exigem consertos
+ * Existe porque "nenhum texto extraido" tem causas que pedem consertos
  * opostos, e da tela nao da para distinguir: o modelo pode nao estar
- * recebendo a imagem, pode nao ter visao, ou pode estar preferindo a saida
- * de emergencia do prompt a transcrever. Roda no deploy e tambem na mao,
- * na propria maquina, sem depender de alguem subir arquivo pela interface.
+ * instalado, pode nao estar recebendo a imagem, ou pode estar recebendo e
+ * preferindo a saida de emergencia do prompt a transcrever. Foi a terceira
+ * que aconteceu, e ela e invisivel de qualquer outro lugar.
  *
- * Manda os bytes da fixture versionada -- os mesmos sempre. Quando duas
- * execucoes discordam, a imagem nao e a variavel.
+ * Usa o prompt compilado em dist/, e nao uma copia: copia se descola, e foi
+ * justamente o prompt que quebrou. Manda os bytes das fixtures versionadas
+ * -- sempre os mesmos -- para que duas execucoes que discordam nao possam
+ * discordar por causa da imagem.
  *
- * Uso: node scripts/diagnostico-visao.mjs [modelo...]
+ * Cada modelo e medido nos dois lados. Transcrever a imagem legivel nao basta:
+ * um prompt que nunca recusa nada faz foto sem texto virar conhecimento vazio.
+ *
+ * Uso: node scripts/diagnostico-visao.mjs [modelo...]   (depois de npm run build)
  */
 import { readFileSync } from 'node:fs';
 
-const FIXTURE = new URL(
-  '../src/ingestion/extraction/__fixtures__/imagem-com-texto.png',
-  import.meta.url,
-);
 const CODIGO = 'TOPAZIO';
-
-// O prompt de producao entrega ao modelo uma saida de uma palavra. Se ele a
-// tomar, o segundo prompt -- que nao a oferece -- separa as duas causas: com
-// o prompt neutro o modelo que ve a imagem transcreve, e o que nao a recebe
-// continua sem ter o que dizer.
-const PROMPT_DE_PRODUCAO = [
-  'Transcreva literalmente todo o texto visível nesta imagem.',
-  'Não descreva a imagem, não traduza e não resuma.',
-  'Não adicione títulos, rótulos, marcadores nem comentários seus.',
-  'Se não houver nenhum texto legível, responda exatamente NENHUM_TEXTO.',
-].join(' ');
-
 const PROMPT_SEM_SAIDA = 'Escreva o que está escrito nesta imagem.';
 
 const host = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
-const timeoutMs = Number(process.env.VISAO_TIMEOUT_MS || 180000);
+const timeoutMs = Number(process.env.VISAO_TIMEOUT_MS || 120000);
 
-async function perguntar(model, prompt, imagemBase64) {
-  const resposta = await fetch(`${host}/api/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      prompt,
-      images: [imagemBase64],
-      stream: false,
-      options: { temperature: 0 },
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!resposta.ok) {
-    return { erro: `o Ollama recusou a chamada (${resposta.status})` };
+let prompt;
+let declarouAusenciaDeTexto;
+try {
+  ({ TRANSCRIPTION_PROMPT: prompt, declarouAusenciaDeTexto } = await import(
+    new URL('../dist/ollama/vision-prompt.js', import.meta.url)
+  ));
+} catch {
+  console.log('dist/ nao esta construido: rode npm run build antes deste diagnostico');
+  process.exit(0);
+}
+
+const imagens = {
+  'com texto': imagemEmBase64('imagem-com-texto.png'),
+  'sem texto': imagemEmBase64('imagem-sem-texto.png'),
+};
+
+function imagemEmBase64(nome) {
+  const caminho = new URL(`../src/ingestion/extraction/__fixtures__/${nome}`, import.meta.url);
+  return readFileSync(caminho).toString('base64');
+}
+
+async function perguntar(model, textoDoPrompt, imagemBase64) {
+  try {
+    const resposta = await fetch(`${host}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt: textoDoPrompt,
+        images: [imagemBase64],
+        stream: false,
+        options: { temperature: 0 },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!resposta.ok) return { erro: `o Ollama recusou a chamada (${resposta.status})` };
+    const dados = await resposta.json();
+    return { texto: String(dados.response ?? '') };
+  } catch (erro) {
+    if (erro?.name === 'TimeoutError') return { erro: `nao respondeu em ${timeoutMs} ms` };
+    return { erro: String(erro?.message || erro) };
   }
-  const dados = await resposta.json();
-  return { texto: String(dados.response ?? '') };
 }
 
 /** Uma linha so, sem quebras, para caber no log do deploy. */
 function resumir(texto) {
-  return texto.replace(/\s+/g, ' ').trim().slice(0, 180);
+  const limpo = texto.replace(/\s+/g, ' ').trim();
+  return limpo.length > 160 ? `${limpo.slice(0, 160)}...` : limpo || '(vazio)';
 }
 
 async function modelosInstalados() {
   try {
     const resposta = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(15000) });
-    const dados = await resposta.json();
-    return (dados.models ?? []).map((m) => m.name);
+    return ((await resposta.json()).models ?? []).map((m) => m.name);
   } catch {
     return [];
   }
 }
 
-const imagemBase64 = readFileSync(FIXTURE).toString('base64');
 const instalados = await modelosInstalados();
-
 const pedidos = process.argv.slice(2).filter(Boolean);
 const alvos = [...new Set(pedidos.length ? pedidos : instalados)];
 
@@ -83,54 +95,42 @@ if (!alvos.length) {
   process.exit(0);
 }
 
-console.log(`imagem de teste: ${imagemBase64.length} caracteres em base64, com o codigo ${CODIGO}`);
-
 for (const modelo of alvos) {
-  if (instalados.length && !instalados.some((nome) => nome === modelo || nome === `${modelo}:latest`)) {
+  if (instalados.length && !instalados.some((n) => n === modelo || n === `${modelo}:latest`)) {
     console.log(`modelo ${modelo}: NAO esta instalado neste Ollama`);
     continue;
   }
 
-  const primeira = await perguntar(modelo, PROMPT_DE_PRODUCAO, imagemBase64).catch((erro) => ({
-    erro: erro?.name === 'TimeoutError' ? `nao respondeu em ${timeoutMs} ms` : String(erro?.message || erro),
-  }));
-
-  if (primeira.erro) {
-    console.log(`modelo ${modelo}: ${primeira.erro}`);
-    continue;
-  }
-
-  if (primeira.texto.toUpperCase().includes(CODIGO)) {
-    console.log(`modelo ${modelo}: LEU a imagem com o prompt de producao`);
-    continue;
-  }
-
-  const disseQueNaoTemTexto = primeira.texto.toUpperCase().includes('NENHUM_TEXTO');
-  const segunda = await perguntar(modelo, PROMPT_SEM_SAIDA, imagemBase64).catch((erro) => ({
-    erro: erro?.name === 'TimeoutError' ? `nao respondeu em ${timeoutMs} ms` : String(erro?.message || erro),
-  }));
-
-  if (segunda.erro) {
-    console.log(`modelo ${modelo}: falhou no prompt neutro -- ${segunda.erro}`);
-    continue;
-  }
-
-  if (segunda.texto.toUpperCase().includes(CODIGO)) {
+  // Lado 1: a imagem legivel tem que virar texto com o prompt de producao.
+  const legivel = await perguntar(modelo, prompt, imagens['com texto']);
+  if (legivel.erro) {
+    console.log(`modelo ${modelo}: imagem com texto -- ${legivel.erro}`);
+  } else if (legivel.texto.toUpperCase().includes(CODIGO)) {
+    console.log(`modelo ${modelo}: imagem com texto -- OK, transcreveu e achou o codigo`);
+  } else {
+    // Nao achou. O prompt neutro separa "nao le" de "le mas desiste".
+    const neutra = await perguntar(modelo, PROMPT_SEM_SAIDA, imagens['com texto']);
+    const leComNeutro = !neutra.erro && neutra.texto.toUpperCase().includes(CODIGO);
     console.log(
-      `modelo ${modelo}: LE a imagem, mas o PROMPT DE PRODUCAO o faz desistir`
-        + `${disseQueNaoTemTexto ? ' (respondeu a sentinela NENHUM_TEXTO)' : ''}`
-        + ' -- o conserto e o prompt, nao o modelo',
+      leComNeutro
+        ? `modelo ${modelo}: imagem com texto -- FALHOU no prompt de producao, mas LE com prompt neutro`
+          + ` (o conserto e o prompt) -- devolveu: ${resumir(legivel.texto)}`
+        : `modelo ${modelo}: imagem com texto -- FALHOU nos dois prompts (o modelo nao esta lendo a imagem)`
+          + ` -- producao: ${resumir(legivel.texto)} | neutro: ${resumir(neutra.texto ?? neutra.erro)}`,
     );
-    continue;
   }
 
-  if (!segunda.texto.trim()) {
-    console.log(`modelo ${modelo}: NAO devolveu nada em nenhum dos dois prompts -- a imagem nao chega ao modelo`);
-    continue;
+  // Lado 2: a imagem sem palavra alguma tem que ser recusada, e o codigo so
+  // reconhece a recusa se ela casar com alguma das formas que ele conhece.
+  const vazia = await perguntar(modelo, prompt, imagens['sem texto']);
+  if (vazia.erro) {
+    console.log(`modelo ${modelo}: imagem sem texto -- ${vazia.erro}`);
+  } else if (declarouAusenciaDeTexto(vazia.texto)) {
+    console.log(`modelo ${modelo}: imagem sem texto -- OK, recusada e a recusa foi reconhecida`);
+  } else {
+    console.log(
+      `modelo ${modelo}: imagem sem texto -- a recusa NAO foi reconhecida,`
+        + ` isto viraria conhecimento vazio -- devolveu: ${resumir(vazia.texto)}`,
+    );
   }
-
-  console.log(
-    `modelo ${modelo}: NAO acha o codigo em nenhum dos dois prompts`
-      + ` -- com o prompt neutro respondeu: ${resumir(segunda.texto)}`,
-  );
 }
