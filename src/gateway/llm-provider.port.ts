@@ -10,6 +10,15 @@ export interface ProviderCapabilities {
 export interface GenerationMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /**
+   * Imagens que acompanham a mensagem, como URLs de dados.
+   *
+   * Vazio na imensa maioria das gerações. Quando vem preenchido, o adaptador
+   * monta o conteúdo multimodal do protocolo; sem isso a imagem seria
+   * descartada em silêncio, que é o defeito que este campo existe para
+   * impedir.
+   */
+  images?: string[];
 }
 
 export interface ProviderRequest {

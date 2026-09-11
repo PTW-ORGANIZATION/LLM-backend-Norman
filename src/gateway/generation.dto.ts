@@ -36,6 +36,16 @@ export const GENERATION_CONTRACT_VERSION = 2;
 
 const SAFE_PATH = /^[^\\]*$/;
 
+/**
+ * Imagem de entrada, como URL de dados.
+ *
+ * O formato é o mesmo que o protocolo OpenAI já usa em `image_url`, então ela
+ * atravessa o adaptador sem tradução. Só os tipos que os provedores de visão
+ * aceitam: recusar aqui dá mensagem clara, enquanto deixar passar devolve um
+ * erro do provedor que não diz qual arquivo era.
+ */
+const DATA_URL_DE_IMAGEM = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
+
 export class GenerationMessageDto {
   @IsIn(['user', 'assistant'])
   role: 'user' | 'assistant';
@@ -44,6 +54,29 @@ export class GenerationMessageDto {
   @MinLength(1)
   @MaxLength(200000)
   content: string;
+
+  /**
+   * As imagens que acompanham esta mensagem.
+   *
+   * Campo opcional de propósito, e não uma versão nova do contrato: a versão
+   * existe para recusar publicação desencontrada entre os dois repositórios, e
+   * subi-la obrigaria a ordem certa de deploy. Opcional, o executor pode subir
+   * antes e o consumidor depois, sem janela quebrada — quem não manda imagem
+   * continua valendo.
+   *
+   * Se o modelo da conexão não tiver visão, quem recusa é o provedor, e a
+   * recusa dele chega inteira a quem pediu.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(4)
+  @IsString({ each: true })
+  @MaxLength(8_000_000, { each: true })
+  @Matches(DATA_URL_DE_IMAGEM, {
+    each: true,
+    message: 'cada imagem precisa ser uma URL de dados base64 de png, jpeg, webp ou gif',
+  })
+  images?: string[];
 }
 
 export class GenerationParamsDto {

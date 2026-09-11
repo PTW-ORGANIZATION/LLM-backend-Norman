@@ -49,7 +49,7 @@ describe('OpenAiChatAdapter', () => {
     expect(new OpenAiChatAdapter().capabilities()).toEqual({
       streaming: true,
       structuredOutput: true,
-      vision: false,
+      vision: true,
       cancellation: true,
     });
   });
@@ -385,5 +385,80 @@ describe('OpenAiChatAdapter.generateStream', () => {
     const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
 
     await expect(coletar(adapter)).rejects.toMatchObject({ kind: 'timeout' });
+  });
+});
+
+describe('OpenAiChatAdapter — mensagens com imagem', () => {
+  function capturarCorpo() {
+    const chamadas: any[] = [];
+    const fetchFalso = (async (_url: string, init: any) => {
+      chamadas.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+      } as any;
+    }) as unknown as typeof fetch;
+    return { chamadas, fetchFalso };
+  }
+
+  const conexao = { available: true, baseUrl: 'https://provedor/v1', apiKey: 'k' } as any;
+
+  it('sem imagem, o conteúdo continua sendo a string de sempre', async () => {
+    const { chamadas, fetchFalso } = capturarCorpo();
+
+    await new OpenAiChatAdapter(fetchFalso).generate(conexao, {
+      model: 'm',
+      messages: [{ role: 'user', content: 'texto puro' }],
+      timeoutMs: 1000,
+    });
+
+    expect(chamadas[0].messages[0].content).toBe('texto puro');
+  });
+
+  // Sem esta montagem a imagem seria descartada em silêncio: o provedor
+  // responderia sobre uma imagem que nunca recebeu, que é indistinguível de
+  // um modelo sem visão para quem lê a resposta.
+  it('com imagem, monta as partes que o protocolo pede', async () => {
+    const { chamadas, fetchFalso } = capturarCorpo();
+    const imagem = 'data:image/png;base64,AAAA';
+
+    await new OpenAiChatAdapter(fetchFalso).generate(conexao, {
+      model: 'm',
+      messages: [{ role: 'user', content: 'o que está escrito?', images: [imagem] }],
+      timeoutMs: 1000,
+    });
+
+    expect(chamadas[0].messages[0].content).toEqual([
+      { type: 'text', text: 'o que está escrito?' },
+      { type: 'image_url', image_url: { url: imagem } },
+    ]);
+  });
+
+  it('leva mais de uma imagem na mesma mensagem', async () => {
+    const { chamadas, fetchFalso } = capturarCorpo();
+
+    await new OpenAiChatAdapter(fetchFalso).generate(conexao, {
+      model: 'm',
+      messages: [{
+        role: 'user',
+        content: 'compare',
+        images: ['data:image/png;base64,AAAA', 'data:image/jpeg;base64,BBBB'],
+      }],
+      timeoutMs: 1000,
+    });
+
+    expect(chamadas[0].messages[0].content).toHaveLength(3);
+  });
+
+  it('lista de imagens vazia não vira conteúdo multimodal', async () => {
+    const { chamadas, fetchFalso } = capturarCorpo();
+
+    await new OpenAiChatAdapter(fetchFalso).generate(conexao, {
+      model: 'm',
+      messages: [{ role: 'user', content: 'texto', images: [] }],
+      timeoutMs: 1000,
+    });
+
+    expect(chamadas[0].messages[0].content).toBe('texto');
   });
 });

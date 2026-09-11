@@ -592,7 +592,11 @@ export class GenerationService {
       { role: 'system' as const, content: spec.systemPrompt },
       ...(dinamico ? [{ role: 'system' as const, content: dinamico }] : []),
       ...blocks.map((content) => ({ role: 'system' as const, content })),
-      ...dto.messages.map((message) => ({ role: message.role, content: message.content })),
+      ...dto.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        ...(message.images?.length ? { images: message.images } : {}),
+      })),
     ];
   }
 

@@ -83,7 +83,32 @@ export class OpenAiChatAdapter implements LlmProvider {
   constructor(@Optional() private readonly fetchImpl: typeof fetch = fetch) {}
 
   capabilities(): ProviderCapabilities {
-    return { streaming: true, structuredOutput: true, vision: false, cancellation: true };
+    // `vision` descreve o protocolo, não o modelo: o chat da OpenAI transporta
+    // imagem, e este adaptador a monta. Se o modelo da conexão não enxergar,
+    // quem recusa é o provedor, e a recusa dele chega inteira a quem pediu —
+    // declarar `false` aqui esconderia um transporte que existe.
+    return { streaming: true, structuredOutput: true, vision: true, cancellation: true };
+  }
+
+  /**
+   * As mensagens no formato do protocolo.
+   *
+   * Sem imagem, `content` continua sendo a string de sempre: mudar o formato
+   * de toda geração por causa de uma minoria multimodal arriscaria o caminho
+   * que já funciona. Com imagem, vira a lista de partes que o protocolo pede.
+   */
+  private wireMessages(messages: ProviderRequest['messages']) {
+    return messages.map((message) =>
+      message.images?.length
+        ? {
+            role: message.role,
+            content: [
+              { type: 'text', text: message.content },
+              ...message.images.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ],
+          }
+        : { role: message.role, content: message.content },
+    );
   }
 
   async generate(
@@ -101,7 +126,7 @@ export class OpenAiChatAdapter implements LlmProvider {
         },
         body: JSON.stringify({
           model: request.model,
-          messages: request.messages,
+          messages: this.wireMessages(request.messages),
           ...(typeof request.temperature === 'number' ? { temperature: request.temperature } : {}),
           ...(typeof request.maxTokens === 'number' ? { max_tokens: request.maxTokens } : {}),
           ...(request.json ? { response_format: { type: 'json_object' } } : {}),
@@ -162,7 +187,7 @@ export class OpenAiChatAdapter implements LlmProvider {
         },
         body: JSON.stringify({
           model: request.model,
-          messages: request.messages,
+          messages: this.wireMessages(request.messages),
           stream: true,
           ...(typeof request.temperature === 'number' ? { temperature: request.temperature } : {}),
           ...(typeof request.maxTokens === 'number' ? { max_tokens: request.maxTokens } : {}),

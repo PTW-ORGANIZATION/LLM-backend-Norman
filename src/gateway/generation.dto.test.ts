@@ -129,3 +129,41 @@ describe('GenerateDto', () => {
     expect(erros.map((erro) => erro.property).sort()).toEqual(['apiKey', 'baseUrl']);
   });
 });
+
+describe('GenerateDto — imagens na mensagem', () => {
+  const comImagens = (images: unknown) => ({
+    ...VALIDO,
+    messages: [{ role: 'user', content: 'o que está escrito?', images }],
+  });
+
+  // O campo é opcional de propósito, e não uma versão nova do contrato: a
+  // versão existe para recusar publicação desencontrada entre os repositórios,
+  // e subi-la obrigaria a ordem certa de deploy. Opcional, o executor sobe
+  // antes e o consumidor depois, sem janela quebrada.
+  it('a mensagem sem imagem continua válida na mesma versão do contrato', () => {
+    expect(validar(VALIDO)).toEqual([]);
+  });
+
+  it('aceita URL de dados dos formatos que os provedores de visão leem', () => {
+    for (const tipo of ['png', 'jpeg', 'jpg', 'webp', 'gif']) {
+      expect(validar(comImagens([`data:image/${tipo};base64,AAAA`]))).toEqual([]);
+    }
+  });
+
+  // Deixar passar devolveria um erro do provedor que não diz qual arquivo era;
+  // recusar aqui nomeia o problema antes de gastar a chamada.
+  it('recusa o que não é URL de dados de imagem', () => {
+    expect(propriedadesComErro(comImagens(['https://exemplo/foto.png']))).toContain('messages');
+    expect(propriedadesComErro(comImagens(['data:application/pdf;base64,AAAA']))).toContain('messages');
+    expect(propriedadesComErro(comImagens(['AAAA']))).toContain('messages');
+  });
+
+  it('recusa mais imagens do que uma mensagem deveria carregar', () => {
+    const muitas = Array.from({ length: 5 }, () => 'data:image/png;base64,AAAA');
+    expect(propriedadesComErro(comImagens(muitas))).toContain('messages');
+  });
+
+  it('recusa quando não é lista', () => {
+    expect(propriedadesComErro(comImagens('data:image/png;base64,AAAA'))).toContain('messages');
+  });
+});
