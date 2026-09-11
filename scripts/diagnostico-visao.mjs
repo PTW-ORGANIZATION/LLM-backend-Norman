@@ -27,14 +27,30 @@ const PROMPT_SEM_SAIDA = 'Escreva o que está escrito nesta imagem.';
 const host = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const timeoutMs = Number(process.env.VISAO_TIMEOUT_MS || 120000);
 
+// O tsconfig nao fixa rootDir, entao o tsc mantem o `src/` no caminho de
+// saida. Tentar os dois evita que uma mudanca de layout do build volte a
+// calar o diagnostico -- e o erro de verdade vai para o log, porque a
+// primeira versao disto engoliu a excecao e disse "dist nao construido"
+// quando o problema era o caminho.
 let prompt;
 let declarouAusenciaDeTexto;
-try {
-  ({ TRANSCRIPTION_PROMPT: prompt, declarouAusenciaDeTexto } = await import(
-    new URL('../dist/ollama/vision-prompt.js', import.meta.url)
-  ));
-} catch {
-  console.log('dist/ nao esta construido: rode npm run build antes deste diagnostico');
+const tentativas = ['../dist/src/ollama/vision-prompt.js', '../dist/ollama/vision-prompt.js'];
+const recusas = [];
+
+for (const caminho of tentativas) {
+  try {
+    ({ TRANSCRIPTION_PROMPT: prompt, declarouAusenciaDeTexto } = await import(
+      new URL(caminho, import.meta.url)
+    ));
+    break;
+  } catch (erro) {
+    recusas.push(`${caminho}: ${erro?.message || erro}`);
+  }
+}
+
+if (!prompt || typeof declarouAusenciaDeTexto !== 'function') {
+  console.log('nao consegui carregar o prompt compilado -- rode npm run build antes deste diagnostico');
+  for (const recusa of recusas) console.log(`  ${recusa}`);
   process.exit(0);
 }
 
