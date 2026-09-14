@@ -55,4 +55,8 @@ caminho, a suíte **falha** dizendo isso — ela não se ignora em silêncio.
 12. citações distinguindo a camada `client` da camada `system`;
 13. retenção da camada geral tirando só ela, com o acervo do cliente intacto;
 14. revogação geral confirmada apagando a evidência para os dois clientes, e o
-    caminho revogado não voltando pela ingestão seguinte.
+    caminho revogado não voltando pela ingestão seguinte;
+15. as regras da revisão de arte iguais nos dois serviços, frase a frase — a
+    revisão roda pelo gateway com o prompt privilegiado daqui e pelo caminho
+    legado com a mensagem que o Norman monta, e enquanto as duas cópias
+    discordavam a de sistema ganhava em silêncio.

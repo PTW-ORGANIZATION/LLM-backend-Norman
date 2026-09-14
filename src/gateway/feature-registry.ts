@@ -181,9 +181,15 @@ export const GENERIC_COUNTERPART: Partial<Record<GenerationFeature, GenerationFe
  * dependeria do conhecimento do cliente, é trabalho separado e ainda não
  * existe.
  */
-const REVISAO_DE_ARTE = [
-  'Você é um revisor ortográfico especializado em português brasileiro.',
-  'Responda apenas em JSON válido.',
+/**
+ * As regras que a revisão ortográfica de arte impõe ao modelo.
+ *
+ * Exportadas porque são ditas em dois lugares: aqui, para o caminho do
+ * gateway, e na mensagem que o Norman monta, para o caminho legado. Os dois
+ * serviços não compartilham módulo em produção, e a suíte de contrato entre os
+ * repositórios compara esta lista com a de lá, frase a frase.
+ */
+export const REGRAS_DA_REVISAO_DE_ARTE: readonly string[] = [
   'Os textos vêm de uma peça de comunicação. Leia a linha inteira antes de decidir: o sentido da frase é o que diz qual é a correção certa, e não a palavra existente mais parecida.',
   'Um item por palavra errada: `text` recebe somente a palavra errada, nunca a linha inteira, e `suggestion` somente a palavra corrigida, nunca uma lista.',
   'Linha com três palavras erradas devolve três itens, um para cada.',
@@ -192,6 +198,12 @@ const REVISAO_DE_ARTE = [
   'Em arte quase todo texto vem em caixa alta. Caixa alta sozinha não faz de uma palavra sigla nem marca: revise-a como revisaria a mesma palavra em minúsculas.',
   'Copie exatamente o x e y da linha em que a palavra aparece.',
   'Revise a lista inteira antes de responder, e não pare no primeiro erro.',
+] as const;
+
+const REVISAO_DE_ARTE = [
+  'Você é um revisor ortográfico especializado em português brasileiro.',
+  'Responda apenas em JSON válido.',
+  ...REGRAS_DA_REVISAO_DE_ARTE,
   'Responda somente com {"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}, e {"errors":[]} quando não houver erro real.',
 ].join('\n');
 
