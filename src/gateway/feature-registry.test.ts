@@ -82,3 +82,28 @@ describe('classificação de vinculação a cliente', () => {
     }
   });
 });
+
+describe('o que a revisão de arte pede ao modelo', () => {
+  const revisao = () => featureSpec('proof_review')!.systemPrompt;
+
+  it('pede a palavra errada, e não a linha inteira', () => {
+    expect(revisao()).toContain('somente a palavra errada, nunca a linha inteira');
+    expect(revisao()).toContain('somente a palavra corrigida, nunca uma lista');
+  });
+
+  it('não manda mais copiar o texto com erro', () => {
+    expect(revisao()).not.toContain('Copie exatamente o texto com erro');
+  });
+
+  it('pede um item por palavra errada', () => {
+    expect(revisao()).toContain('três itens');
+  });
+
+  it('avisa que caixa alta não faz de uma palavra sigla nem marca', () => {
+    expect(revisao()).toContain('Caixa alta sozinha não faz de uma palavra sigla nem marca');
+  });
+
+  it('manda escolher a correção pelo sentido da frase', () => {
+    expect(revisao()).toContain('não a palavra existente mais parecida');
+  });
+});

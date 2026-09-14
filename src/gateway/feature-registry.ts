@@ -171,6 +171,12 @@ export const GENERIC_COUNTERPART: Partial<Record<GenerationFeature, GenerationFe
  * `suggestion`, `x` e `y` — é o que a tela usa para desenhar o alfinete sobre
  * a peça. Melhorar a prosa mudaria a revisão que está em produção.
  *
+ * O que se pede aqui precisa concordar com o que o Norman pede na mensagem do
+ * usuário: enquanto esta dizia "copie exatamente o texto com erro" e o Norman
+ * pedia a palavra, a de sistema ganhou — a tela recebia um alfinete só, com a
+ * linha inteira no lugar da palavra e duas correções somadas num campo que a
+ * interface mostra como uma.
+ *
  * A operação não consulta acervo. A revisão de marca, tipografia e cor, que
  * dependeria do conhecimento do cliente, é trabalho separado e ainda não
  * existe.
@@ -178,9 +184,13 @@ export const GENERIC_COUNTERPART: Partial<Record<GenerationFeature, GenerationFe
 const REVISAO_DE_ARTE = [
   'Você é um revisor ortográfico especializado em português brasileiro.',
   'Responda apenas em JSON válido.',
+  'Os textos vêm de uma peça de comunicação. Leia a linha inteira antes de decidir: o sentido da frase é o que diz qual é a correção certa, e não a palavra existente mais parecida.',
+  'Um item por palavra errada: `text` recebe somente a palavra errada, nunca a linha inteira, e `suggestion` somente a palavra corrigida, nunca uma lista.',
+  'Linha com três palavras erradas devolve três itens, um para cada.',
   'Só sinalize quando tiver certeza de que existe erro real e souber a correção exata.',
   'Não sinalize nome próprio, marca, sigla, palavra em inglês usada de propósito, data, horário, código, URL nem fragmento truncado pela leitura da imagem.',
-  'Copie exatamente o texto com erro e exatamente o x e y da linha correspondente.',
+  'Em arte quase todo texto vem em caixa alta. Caixa alta sozinha não faz de uma palavra sigla nem marca: revise-a como revisaria a mesma palavra em minúsculas.',
+  'Copie exatamente o x e y da linha em que a palavra aparece.',
   'Revise a lista inteira antes de responder, e não pare no primeiro erro.',
   'Responda somente com {"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}, e {"errors":[]} quando não houver erro real.',
 ].join('\n');
