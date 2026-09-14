@@ -5,6 +5,7 @@ import { InternalAuthGuard } from '../auth/internal-auth.guard';
 import { InternalCapabilityGuard } from '../auth/internal-capability.guard';
 import { RequiresCapability } from '../auth/internal-capabilities';
 import { OllamaVisionService } from '../ollama/ollama-vision.service';
+import { reduzirArteParaLeitura } from './reduzir-arte';
 import { TranscribeImageDto, VISION_CONTRACT_VERSION } from './transcribe-image.dto';
 
 function bytesDaDataUrl(dataUrl: string): Buffer {
@@ -32,14 +33,18 @@ export class InternalVisionController {
   @RequiresCapability('documents.extract')
   @Post('transcribe')
   async transcribe(@Body() dto: TranscribeImageDto) {
-    const imagem = bytesDaDataUrl(dto.image);
-    const resultado = await this.vision.transcribeImageWithDiagnosis(imagem, {
+    const recebida = bytesDaDataUrl(dto.image);
+    const arte = await reduzirArteParaLeitura(recebida);
+    const comecou = Date.now();
+    const resultado = await this.vision.transcribeImageWithDiagnosis(arte.imagem, {
       timeoutMs: this.config.get<number>('ingestion.ocrTimeoutMs', 180000),
     });
 
     this.logger.log(
-      `transcrição [correlationId=${dto.correlationId} bytes=${imagem.length} `
-        + `modelo=${resultado.model} caracteres=${resultado.text.length}]`,
+      `transcrição [correlationId=${dto.correlationId} bytes=${recebida.length} `
+        + `${arte.reduzida ? `reduzida=${arte.largura}x${arte.altura} enviados=${arte.imagem.length} ` : ''}`
+        + `modelo=${resultado.model} caracteres=${resultado.text.length} `
+        + `duracao=${Date.now() - comecou}ms]`,
     );
 
     return {

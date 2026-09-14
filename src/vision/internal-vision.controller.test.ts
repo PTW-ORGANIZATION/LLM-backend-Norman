@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 
 import { InternalVisionController } from './internal-vision.controller';
+import { MAIOR_LADO_PARA_LEITURA } from './reduzir-arte';
 import { TranscribeImageDto, VISION_CONTRACT_VERSION } from './transcribe-image.dto';
 
 const PNG = 'data:image/png;base64,AAAA';
@@ -74,6 +76,21 @@ describe('InternalVisionController', () => {
     const resposta = await controller.transcribe({ ...VALIDO } as TranscribeImageDto);
 
     expect(resposta.semTextoLegivel).toBe(true);
+  });
+
+  it('reduz a arte grande antes de entregá-la ao modelo', async () => {
+    vision.transcribeImageWithDiagnosis.mockResolvedValue({
+      text: 'ok', model: 'minicpm-v', rawLength: 2, sentinel: false,
+    });
+    const grande = createCanvas(2000, 1600);
+    grande.getContext('2d').fillRect(0, 0, 2000, 1600);
+    const image = `data:image/jpeg;base64,${grande.toBuffer('image/jpeg', 90).toString('base64')}`;
+
+    await controller.transcribe({ ...VALIDO, image } as TranscribeImageDto);
+
+    const [bytes] = vision.transcribeImageWithDiagnosis.mock.calls[0];
+    const entregue = await loadImage(bytes);
+    expect(Math.max(entregue.width, entregue.height)).toBe(MAIOR_LADO_PARA_LEITURA);
   });
 
   it('entrega ao modelo os bytes da imagem, e não a URL de dados', async () => {
