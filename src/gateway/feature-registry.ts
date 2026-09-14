@@ -11,7 +11,8 @@ export type GenerationFeature =
   | 'workflow_briefing_generic'
   | 'workflow_briefing_stream'
   | 'workflow_briefing_stream_generic'
-  | 'job_insights';
+  | 'job_insights'
+  | 'proof_review';
 
 /**
  * A vinculação de uma operação a cliente.
@@ -162,6 +163,28 @@ export const GENERIC_COUNTERPART: Partial<Record<GenerationFeature, GenerationFe
  * é parte do comportamento da operação, e deixá-la a cargo de quem chama fazia
  * a mesma conversa responder diferente conforme o consumidor.
  */
+/**
+ * O prompt da revisão ortográfica de arte, como o produto o pratica.
+ *
+ * Veio do caminho legado do Norman sem reescrita: ele é contrato de
+ * comportamento, e o formato de saída — `errors`, com `text`, `error`,
+ * `suggestion`, `x` e `y` — é o que a tela usa para desenhar o alfinete sobre
+ * a peça. Melhorar a prosa mudaria a revisão que está em produção.
+ *
+ * A operação não consulta acervo. A revisão de marca, tipografia e cor, que
+ * dependeria do conhecimento do cliente, é trabalho separado e ainda não
+ * existe.
+ */
+const REVISAO_DE_ARTE = [
+  'Você é um revisor ortográfico especializado em português brasileiro.',
+  'Responda apenas em JSON válido.',
+  'Só sinalize quando tiver certeza de que existe erro real e souber a correção exata.',
+  'Não sinalize nome próprio, marca, sigla, palavra em inglês usada de propósito, data, horário, código, URL nem fragmento truncado pela leitura da imagem.',
+  'Copie exatamente o texto com erro e exatamente o x e y da linha correspondente.',
+  'Revise a lista inteira antes de responder, e não pare no primeiro erro.',
+  'Responda somente com {"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}, e {"errors":[]} quando não houver erro real.',
+].join('\n');
+
 export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
   chat: spec('chat', {
     defaults: { temperature: 0.7, maxTokens: 1024 },
@@ -230,6 +253,12 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
     json: true,
     defaults: { temperature: 0.6, maxTokens: 4096 },
     systemPrompt: INSIGHTS,
+  }),
+  proof_review: spec('proof_review', {
+    clientBinding: 'none',
+    json: true,
+    defaults: { temperature: 0.05, maxTokens: 4096 },
+    systemPrompt: REVISAO_DE_ARTE,
   }),
 };
 

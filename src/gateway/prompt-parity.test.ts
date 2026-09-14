@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FEATURE_SPECS, GENERATION_FEATURES } from './feature-registry';
+import { FEATURE_SPECS, GENERATION_FEATURES, type GenerationFeature } from './feature-registry';
 import { renderInsightsPrompt, renderWorkflowBriefingPrompt } from './feature-payloads';
 
 /**
@@ -11,6 +11,16 @@ import { renderInsightsPrompt, renderWorkflowBriefingPrompt } from './feature-pa
  * reescrito "melhor" que perca qualquer um deles muda a conversa que está em
  * produção.
  */
+/**
+ * Operações que recebem dados e devolvem análise, sem conversar com ninguém.
+ *
+ * A declaração de "não há acervo de cliente" existe para a conversa: sem ela,
+ * o modelo trata ausência de contexto como ausência de informação e afirma o
+ * que não sabe. Numa revisão de lista de textos não há esse risco, e a frase
+ * seria ruído no meio de um contrato de saída em JSON.
+ */
+const OPERACOES_SEM_CONVERSA = new Set<GenerationFeature>(['job_insights', 'proof_review']);
+
 describe('paridade dos prompts do gateway', () => {
   const chat = FEATURE_SPECS.chat.systemPrompt;
   const briefing = FEATURE_SPECS.briefing_final.systemPrompt;
@@ -86,10 +96,10 @@ describe('paridade dos prompts do gateway', () => {
   // O modo genérico não pode calar sobre o acervo: sem dizer que não há
   // nenhum, o modelo trata a ausência de contexto como ausência de informação
   // e afirma o que não sabe.
-  it('toda operação genérica declara que não há acervo de cliente', () => {
+  it('toda operação genérica de conversa declara que não há acervo de cliente', () => {
     for (const feature of GENERATION_FEATURES) {
       if (FEATURE_SPECS[feature].clientBinding !== 'none') continue;
-      if (feature === 'job_insights') continue;
+      if (OPERACOES_SEM_CONVERSA.has(feature)) continue;
       expect(FEATURE_SPECS[feature].systemPrompt).toContain('Não há acervo de cliente nesta conversa');
     }
   });
