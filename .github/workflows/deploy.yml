@@ -187,6 +187,15 @@ jobs:
               node scripts/diagnostico-visao.mjs "${visao}" minicpm-v \
               || echo "o diagnostico de visao nao chegou ao fim"
             echo "::endgroup::"
+            # Quanto a leitura de arte demorou, e em que tamanho ela foi. O
+            # chamador desiste em 180 segundos e a desistencia chega la como
+            # "revisao nao disponivel": sem a duracao registrada aqui, subir ou
+            # baixar o teto de reducao vira palpite.
+            echo "::group::Ultimas leituras de arte"
+            leituras=$(pm2 logs llm-backend --lines 500 --nostream 2>&1 \
+              | grep -a "transcricao \[\|transcrição \[" | tail -10)
+            if [ -n "${leituras}" ]; then echo "${leituras}"; else echo "nenhuma leitura registrada"; fi
+            echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \
               | grep -aiE "warn|error|falhou|recusou" | tail -30

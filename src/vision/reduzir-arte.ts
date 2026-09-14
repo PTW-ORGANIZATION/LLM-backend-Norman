@@ -8,8 +8,6 @@
  */
 export const MAIOR_LADO_PARA_LEITURA = 1200;
 
-const QUALIDADE_JPEG = 90;
-
 export type ArteParaLeitura = {
   imagem: Buffer;
   largura: number;
@@ -21,7 +19,7 @@ type ModuloDeCanvas = {
   loadImage: (fonte: Buffer) => Promise<{ width: number; height: number }>;
   createCanvas: (largura: number, altura: number) => {
     getContext: (tipo: '2d') => { drawImage: (imagem: unknown, x: number, y: number, largura: number, altura: number) => void };
-    toBuffer: (mime: 'image/jpeg', qualidade: number) => Buffer;
+    toBuffer: (mime: 'image/png') => Buffer;
   };
 };
 
@@ -32,6 +30,10 @@ type ModuloDeCanvas = {
  * imagem que a biblioteca não consegue decodificar também volta como veio: a
  * leitura é quem decide o que fazer com ela, e reduzir é otimização, não
  * validação.
+ *
+ * A saída é PNG, e não JPEG: quem recebe esta imagem é um modelo que precisa
+ * ler letras, e a arte que chega aqui já é JPEG uma vez. Uma segunda geração
+ * com perdas suja a borda dos glifos justamente onde a leitura se decide.
  *
  * @param imagem os bytes da arte
  * @param maiorLado o teto para o maior lado, em pixels
@@ -62,5 +64,5 @@ export async function reduzirArteParaLeitura(
   const destino = canvas.createCanvas(largura, altura);
   destino.getContext('2d').drawImage(original, 0, 0, largura, altura);
 
-  return { imagem: destino.toBuffer('image/jpeg', QUALIDADE_JPEG), largura, altura, reduzida: true };
+  return { imagem: destino.toBuffer('image/png'), largura, altura, reduzida: true };
 }
