@@ -133,6 +133,21 @@ jobs:
               else
                 echo "porta ${porta}: capacidades do gateway NAO respondem (build sem gateway ou token recusado)"
               fi
+              # A leitura de arte do proofing depende desta rota. Ela aceita o
+              # mesmo token e exige a capacidade documents.extract: 404 é build
+              # antigo, 403 e a capacidade nao concedida, 400 e a rota viva
+              # recusando a imagem de mentira que este teste manda.
+              codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+                -X POST -H 'Content-Type: application/json' \
+                -H "x-internal-token: ${{ secrets.INTERNAL_API_TOKEN }}" \
+                -d '{"contractVersion":1,"correlationId":"deploy-check","image":"nao-e-imagem"}' \
+                "http://127.0.0.1:${porta}/internal/vision/transcribe")
+              case "${codigo}" in
+                400) echo "porta ${porta}: rota de leitura de arte VIVA (recusou a imagem invalida, como deve)" ;;
+                404) echo "porta ${porta}: rota de leitura de arte AUSENTE (build sem ela)" ;;
+                401|403) echo "porta ${porta}: rota de leitura de arte recusou o token ou a capacidade" ;;
+                *) echo "porta ${porta}: rota de leitura de arte respondeu algo inesperado" ;;
+              esac
             done
             echo "::endgroup::"
             # O modelo de visão existe neste Ollama? Ele é lido de
