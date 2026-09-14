@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { json } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -16,6 +17,13 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // O padrão do Express é 100 KB, e a leitura de texto em arte manda a imagem
+  // no corpo: uma peça de 275 KB vira ~366 KB em base64 e era recusada antes
+  // de chegar ao controller. Quem chamava caía no leitor reserva sem saber por
+  // quê, e a tela mostrava o resultado do reserva como se fosse do modelo de
+  // visão. O teto aqui acompanha o que o DTO da rota já limita por imagem.
+  app.use(json({ limit: '16mb' }));
 
   // CORS liberado para o frontend React consumir a API.
   // Em produção, troque origin: true por a URL exata do seu frontend.
