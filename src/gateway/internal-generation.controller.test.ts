@@ -155,7 +155,7 @@ describe('reutilização por outra aplicação', () => {
     expect((await controller.capabilities()).multimodal).toEqual({
       imageDescription: { implemented: true, exposedToConsumers: false, usedBy: ['ocr-de-ingestao'] },
       imageGeneration: { implemented: false, exposedToConsumers: false, usedBy: [] },
-      spellCheckOnArtwork: { implemented: false, exposedToConsumers: false, usedBy: [] },
+      spellCheckOnArtwork: { implemented: true, exposedToConsumers: true, usedBy: ['revisao-de-arte-do-norman'] },
     });
   });
 

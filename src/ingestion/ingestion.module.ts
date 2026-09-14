@@ -4,6 +4,7 @@ import { OllamaModule } from '../ollama/ollama.module';
 import { QueueModule } from '../queue/queue.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { InternalDocumentsController } from './internal-documents.controller';
+import { InternalVisionController } from '../vision/internal-vision.controller';
 import { InternalKnowledgeController } from './internal-knowledge.controller';
 import { IngestionProcessor } from './ingestion.processor';
 import { TextExtractionService } from './extraction/text-extraction.service';
@@ -12,7 +13,7 @@ import { NormanDocumentContentAdapter } from './norman-document-content.adapter'
 
 @Module({
   imports: [DocumentsModule, OllamaModule, QueueModule, KnowledgeModule],
-  controllers: [InternalDocumentsController, InternalKnowledgeController],
+  controllers: [InternalDocumentsController, InternalKnowledgeController, InternalVisionController],
   providers: [
     TextExtractionService,
     IngestionProcessor,

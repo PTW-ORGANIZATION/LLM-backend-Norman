@@ -35,14 +35,15 @@ import type { ConsumerApplication } from '../auth/consumer-registry';
  * O que o gateway sabe fazer com imagem hoje.
  *
  * Declarado explicitamente, e não presumido: a descrição de imagem existe e é
- * usada no OCR de slide e de página escaneada. Não há rota de geração
- * multimodal aberta a consumidor, e a análise ortográfica de arte que o PDF
- * menciona para o Niprofe continua fora deste contrato.
+ * usada no OCR de slide e de página escaneada. A leitura de texto em arte
+ * passou a ser exposta em `internal/vision/transcribe`, para a revisão do
+ * Norman parar de depender de um OCR clássico que lia a textura das fotos em
+ * vez do título da peça.
  */
 export const MULTIMODAL_CAPABILITIES = {
   imageDescription: { implemented: true, exposedToConsumers: false, usedBy: ['ocr-de-ingestao'] },
   imageGeneration: { implemented: false, exposedToConsumers: false, usedBy: [] },
-  spellCheckOnArtwork: { implemented: false, exposedToConsumers: false, usedBy: [] },
+  spellCheckOnArtwork: { implemented: true, exposedToConsumers: true, usedBy: ['revisao-de-arte-do-norman'] },
 };
 
 /**
