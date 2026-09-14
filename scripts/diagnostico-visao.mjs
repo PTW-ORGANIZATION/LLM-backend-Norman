@@ -57,6 +57,7 @@ if (!prompt || typeof declarouAusenciaDeTexto !== 'function') {
 const imagens = {
   'com texto': imagemEmBase64('imagem-com-texto.png'),
   'sem texto': imagemEmBase64('imagem-sem-texto.png'),
+  'arte colorida': imagemEmBase64('imagem-arte-colorida.png'),
 };
 
 function imagemEmBase64(nome) {
@@ -133,6 +134,20 @@ for (const modelo of alvos) {
           + ` (o conserto e o prompt) -- devolveu: ${resumir(legivel.texto)}`
         : `modelo ${modelo}: imagem com texto -- FALHOU nos dois prompts (o modelo nao esta lendo a imagem)`
           + ` -- producao: ${resumir(legivel.texto)} | neutro: ${resumir(neutra.texto ?? neutra.erro)}`,
+    );
+  }
+
+  // Lado 3: a arte colorida, que e onde a revisao de peca falha hoje. Aqui o
+  // que interessa nao e so achar o codigo: e VER o que o modelo leu, porque a
+  // tela mostra o que o revisor concluiu e nunca o que ele recebeu.
+  const arte = await perguntar(modelo, prompt, imagens['arte colorida']);
+  if (arte.erro) {
+    console.log(`modelo ${modelo}: arte colorida -- ${arte.erro}`);
+  } else {
+    const achou = arte.texto.toUpperCase().includes(CODIGO);
+    console.log(
+      `modelo ${modelo}: arte colorida -- ${achou ? 'OK, achou o codigo' : 'NAO achou o codigo'}`
+        + ` -- leu: ${resumir(arte.texto)}`,
     );
   }
 

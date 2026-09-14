@@ -313,6 +313,62 @@ def gerar_png_sem_texto():
     print("gerado", destino)
 
 
+CODIGO_DA_ARTE = "TOPAZIO 8841"
+
+
+def gerar_png_arte_colorida():
+    """Uma arte publicitaria em miniatura: texto colorido sobre fundo colorido.
+
+    As outras duas fixtures sao preto sobre branco, que todo leitor de imagem
+    acerta. Peca de verdade nao e assim -- a que expos o problema tinha branco
+    sobre azul-claro e amarelo sobre azul-claro, e o leitor classico enxergava
+    a textura das fotos em vez do titulo.
+
+    Serve para o diagnostico do deploy medir o caso dificil, e nao so o facil.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    destino = os.path.join(AQUI, "imagem-arte-colorida.png")
+    branco = (255, 255, 255)
+    amarelo = (250, 226, 116)
+    linhas = [
+        ("VENHA", 78, branco),
+        ("SELEBRAR!", 78, branco),
+        ("", 40, None),
+        ("O PEQUENO", 72, amarelo),
+        ("GABRIEL", 72, amarelo),
+        ("VAI FASER", 72, amarelo),
+        ("UM AMINHO!", 72, amarelo),
+        ("", 30, None),
+        (CODIGO_DA_ARTE, 48, branco),
+    ]
+
+    def fonte(tamanho):
+        for candidata in (
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ):
+            if os.path.exists(candidata):
+                return ImageFont.truetype(candidata, tamanho)
+        return ImageFont.load_default()
+
+    imagem = Image.new("RGB", (900, 1100), (138, 199, 214))
+    pincel = ImageDraw.Draw(imagem)
+    y = 90
+    for texto, tamanho, cor in linhas:
+        if not texto:
+            y += tamanho
+            continue
+        f = fonte(tamanho)
+        caixa = pincel.textbbox((0, 0), texto, font=f)
+        pincel.text(((900 - (caixa[2] - caixa[0])) // 2, y), texto, fill=cor, font=f)
+        y += tamanho + 20
+
+    imagem.save(destino, "PNG", optimize=True)
+    print("gerado", destino)
+
+
 if __name__ == "__main__":
     gerar_doc()
     gerar_xls()
@@ -320,3 +376,4 @@ if __name__ == "__main__":
     gerar_pdf()
     gerar_png_com_texto()
     gerar_png_sem_texto()
+    gerar_png_arte_colorida()
