@@ -89,6 +89,7 @@ describeIntegration('KnowledgeProcessor contra banco e Ollama reais', () => {
     processor = new KnowledgeProcessor(
       config,
       chunksService,
+      documentsService,
       notesService,
       new NoteGenerationService(config, ollama),
       queue,

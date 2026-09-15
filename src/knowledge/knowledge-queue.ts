@@ -13,6 +13,12 @@ import {
  *
  * O `jobId` é o par documento + conteúdo: reenviar o mesmo arquivo reaproveita
  * o job que já está na fila em vez de estudar duas vezes.
+ *
+ * `removeOnFail: true` pelo mesmo motivo que a consolidação: job guardado
+ * mantém o id ocupado, e a fila ignora em silêncio um `add` com id que já
+ * existe. Enquanto o job que falhou ficava guardado, reprocessar o documento
+ * não enfileirava nada — o arquivo ficava parado em "estudando" e imune a
+ * nova tentativa. O motivo da falha não se perde: ele vai para o documento.
  */
 export async function enqueueDocumentStudy(
   queue: Queue<KnowledgeJobData>,
@@ -23,7 +29,7 @@ export async function enqueueDocumentStudy(
     attempts: 3,
     backoff: { type: 'exponential', delay: 15000 },
     removeOnComplete: 1000,
-    removeOnFail: 5000,
+    removeOnFail: true,
   });
 }
 

@@ -203,6 +203,18 @@ jobs:
             # "nenhuma leitura registrada" para um servico que tinha acabado de
             # transcrever uma arte. Dizer que os arquivos nao foram achados e
             # diferente de dizer que nada foi lido.
+            # A ingestao termina marcando o documento como pronto; o estudo
+            # e a etapa seguinte, e e ela que grava a nota. Documento pronto
+            # sem nota e o que a tela mostra como "Estudando" — e, quando o
+            # estudo falhou de vez, ele ficava assim sem nada que o tirasse de
+            # la. Ninguem percebia o acumulo ate alguem reparar na tela dias
+            # depois.
+            echo "::group::Estudos parados"
+            DB_HOST="${{ secrets.DB_HOST }}" DB_PORT="${{ secrets.DB_PORT }}" \
+              DB_USERNAME="${{ secrets.DB_USERNAME }}" DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              DB_DATABASE="${{ secrets.DB_DATABASE }}" \
+              node scripts/estudos-parados.mjs
+            echo "::endgroup::"
             echo "::group::Ultimas leituras de arte"
             arquivos=$(pm2 jlist 2>/dev/null | node -e '
               let bruto = "";

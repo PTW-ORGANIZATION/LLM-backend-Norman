@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Job, UnrecoverableError } from 'bullmq';
 import { describe, expect, it, vi } from 'vitest';
 import { DocumentChunksService } from '../documents/document-chunks.service';
+import { DocumentsService } from '../documents/documents.service';
 import { KnowledgeNote, KnowledgeNoteKind } from './knowledge-note.entity';
 import { KnowledgeNotesService } from './knowledge-notes.service';
 import { ConsolidateResult, KnowledgeProcessor, StudyResult } from './knowledge.processor';
@@ -124,6 +125,13 @@ function buildProcessor(
     synthesizeClient,
   } as unknown as NoteGenerationService;
 
+  const marcadosComoFalha: Array<{ documentId: string; reason: string }> = [];
+  const documentsService = {
+    markFailed: vi.fn(async (documentId: string, reason: string) => {
+      marcadosComoFalha.push({ documentId, reason });
+    }),
+  } as unknown as DocumentsService;
+
   const enqueued: Array<{ name: string; data: unknown; opts: Record<string, unknown> }> = [];
   const queue = {
     add: async (name: string, data: unknown, opts: Record<string, unknown>) => {
@@ -133,9 +141,11 @@ function buildProcessor(
   } as unknown as Queue<KnowledgeJobData>;
 
   return {
+    marcadosComoFalha,
     processor: new KnowledgeProcessor(
       config,
       chunksService,
+      documentsService,
       notesService,
       noteGeneration,
       queue,
@@ -498,5 +508,74 @@ describe('KnowledgeProcessor no acervo geral do sistema', () => {
 
     expect(saved[0]).toMatchObject({ scope: 'client', clientId: 'cli-vitalis' });
     expect(enqueued.map((entry) => entry.name)).toEqual([CONSOLIDATE_CLIENT_JOB]);
+  });
+});
+
+// A ingestão termina marcando o documento como pronto, e o estudo é a etapa
+// seguinte. Enquanto a falha do estudo não tocava o documento, ele ficava
+// pronto e sem nota — que é o que a tela do Norman mostra como "Estudando",
+// para sempre e sem erro em lugar nenhum.
+describe('KnowledgeProcessor — o estudo que não vai mais acontecer', () => {
+  function jobQueFalhou(overrides: Partial<Job<KnowledgeJobData>> = {}): Job<KnowledgeJobData> {
+    return {
+      name: STUDY_DOCUMENT_JOB,
+      data: JOB_DATA,
+      attemptsMade: 3,
+      opts: { attempts: 3 },
+      ...overrides,
+    } as Job<KnowledgeJobData>;
+  }
+
+  it('registra no documento a falha definitiva', async () => {
+    const { processor, marcadosComoFalha } = buildProcessor();
+
+    await processor.registrarEstudoPerdido(jobQueFalhou(), new Error('modelo fora do ar'));
+
+    expect(marcadosComoFalha).toEqual([
+      { documentId: 'doc-1', reason: 'o estudo do documento falhou: modelo fora do ar' },
+    ]);
+  });
+
+  it('registra também a falha que não admite repetição', async () => {
+    const { processor, marcadosComoFalha } = buildProcessor();
+    const irrecuperavel = new UnrecoverableError('nota inválida');
+
+    await processor.registrarEstudoPerdido(
+      jobQueFalhou({ attemptsMade: 1 } as Partial<Job<KnowledgeJobData>>),
+      irrecuperavel,
+    );
+
+    expect(marcadosComoFalha).toHaveLength(1);
+  });
+
+  // Falha de tentativa intermediária é a fila fazendo o trabalho dela. Marcar
+  // o documento ali poria um erro na tela enquanto a próxima ainda está por vir.
+  it('não registra enquanto ainda há tentativa por vir', async () => {
+    const { processor, marcadosComoFalha } = buildProcessor();
+
+    await processor.registrarEstudoPerdido(
+      jobQueFalhou({ attemptsMade: 1 } as Partial<Job<KnowledgeJobData>>),
+      new Error('timeout'),
+    );
+
+    expect(marcadosComoFalha).toEqual([]);
+  });
+
+  it('não encosta em documento quando quem falhou foi outro job', async () => {
+    const { processor, marcadosComoFalha } = buildProcessor();
+
+    await processor.registrarEstudoPerdido(
+      jobQueFalhou({ name: CONSOLIDATE_CLIENT_JOB } as Partial<Job<KnowledgeJobData>>),
+      new Error('modelo fora'),
+    );
+
+    expect(marcadosComoFalha).toEqual([]);
+  });
+
+  it('não quebra quando a fila entrega o evento sem job', async () => {
+    const { processor, marcadosComoFalha } = buildProcessor();
+
+    await expect(processor.registrarEstudoPerdido(undefined, new Error('x'))).resolves.toBeUndefined();
+    expect(marcadosComoFalha).toEqual([]);
   });
 });

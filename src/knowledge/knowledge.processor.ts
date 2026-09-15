@@ -1,9 +1,10 @@
 import { Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
+import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Job, Queue, UnrecoverableError } from 'bullmq';
 import { KNOWLEDGE_JOBS_QUEUE_NAME } from '../queue/queue.constants';
 import { DocumentChunksService } from '../documents/document-chunks.service';
+import { DocumentsService } from '../documents/documents.service';
 import { KnowledgeNoteKind } from './knowledge-note.entity';
 import { KnowledgeNotesService } from './knowledge-notes.service';
 import { DocumentSummaryRequest, NoteGenerationService } from './note-generation.service';
@@ -59,12 +60,50 @@ export class KnowledgeProcessor extends WorkerHost implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly documentChunksService: DocumentChunksService,
+    private readonly documentsService: DocumentsService,
     private readonly knowledgeNotesService: KnowledgeNotesService,
     private readonly noteGeneration: NoteGenerationService,
     @InjectQueue(KNOWLEDGE_JOBS_QUEUE_NAME)
     private readonly knowledgeQueue: Queue<KnowledgeJobData>,
   ) {
     super();
+  }
+
+  /**
+   * O estudo que não vai mais acontecer, registrado no documento.
+   *
+   * A ingestão termina marcando o documento como pronto, e o estudo é a etapa
+   * seguinte. Quando ela falha de vez, nada tocava o documento: ele ficava
+   * pronto e sem nota, e "pronto sem nota" é exatamente o que a tela do
+   * Norman mostra como "Estudando" — para sempre, sem erro em lugar nenhum.
+   *
+   * Só a falha definitiva conta. Falha de tentativa intermediária é a fila
+   * fazendo o trabalho dela, e marcar o documento ali poria um erro na tela
+   * enquanto a próxima tentativa ainda está por vir.
+   */
+  @OnWorkerEvent('failed')
+  async registrarEstudoPerdido(job: Job<KnowledgeJobData> | undefined, error: Error): Promise<void> {
+    if (!job || job.name !== STUDY_DOCUMENT_JOB) return;
+
+    const tentativas = job.opts?.attempts ?? 1;
+    const definitiva = error?.name === 'UnrecoverableError' || job.attemptsMade >= tentativas;
+    if (!definitiva) return;
+
+    const { documentId, filename } = job.data as StudyDocumentJobData;
+    if (!documentId) return;
+
+    try {
+      await this.documentsService.markFailed(
+        documentId,
+        `o estudo do documento falhou: ${error?.message || 'sem mensagem'}`,
+      );
+      this.logger.warn(`Estudo de "${filename}" desistiu de vez: ${error?.message || error}`);
+    } catch (falha) {
+      this.logger.error(
+        `Não consegui registrar a falha do estudo de "${filename}": ` +
+          `${falha instanceof Error ? falha.message : falha}`,
+      );
+    }
   }
 
   onModuleInit() {
