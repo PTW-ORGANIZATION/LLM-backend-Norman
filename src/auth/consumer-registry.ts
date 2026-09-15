@@ -37,8 +37,15 @@ const NORMAN_CLIENT_BOUND_FEATURES: GenerationFeature[] = [
   'workflow_briefing_stream',
 ];
 
-/** As operações do Norman que já nascem sem vínculo com cliente. */
-const NORMAN_STANDALONE_FEATURES: GenerationFeature[] = ['job_insights'];
+/**
+ * As operações do Norman que já nascem sem vínculo com cliente.
+ *
+ * `proof_review` faltou aqui desde que existe, e a falta não aparecia: o
+ * Norman levava 403, registrava um aviso e revisava a arte no caminho legado.
+ * A tela dizia que a revisão usava a conexão ativa, a auditoria não registrava
+ * execução nenhuma, e a revisão inteira acontecia no modelo local.
+ */
+const NORMAN_STANDALONE_FEATURES: GenerationFeature[] = ['job_insights', 'proof_review'];
 
 /**
  * As operações do consumidor `norman`, derivadas do próprio registro.

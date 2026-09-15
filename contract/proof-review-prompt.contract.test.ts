@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { NORMAN_FEATURES } from '../src/auth/consumer-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_EXECUTOR, featureSpec } from '../src/gateway/feature-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_NORMAN } from '@norman/lib/proof-review-rules';
+import { GATEWAY_FEATURES } from '@norman/modules/ai/llm-gateway.client';
 
 /**
  * As regras da revisão de arte, comparadas entre os dois serviços.
@@ -37,5 +39,28 @@ describe('as regras da revisão de arte nos dois serviços', () => {
 
     expect(sistema).not.toContain('Copie exatamente o texto com erro');
     expect(REGRAS_DO_NORMAN.join('\n')).not.toContain('copie EXATAMENTE o texto com erro');
+  });
+});
+
+/**
+ * O que o Norman consegue pedir contra o que o executor autoriza.
+ *
+ * A autorização é operação por operação, e uma operação que falta na lista do
+ * executor não explode: o pedido leva 403, o Norman registra um aviso e cai no
+ * caminho legado. Foi o que aconteceu com `proof_review` desde que ela existe
+ * — a tela dizia que a revisão de arte usava a conexão ativa, a auditoria não
+ * registrava execução nenhuma, e tudo rodava no modelo local. Nenhuma das duas
+ * suítes isoladas podia ver isso: uma tem a lista do cliente, a outra a do
+ * servidor.
+ */
+describe('as operações que o Norman pede e as que o executor autoriza', () => {
+  it('são o mesmo conjunto', () => {
+    expect([...NORMAN_FEATURES].sort()).toEqual([...GATEWAY_FEATURES].sort());
+  });
+
+  it('todas têm prompt privilegiado declarado', () => {
+    for (const feature of GATEWAY_FEATURES) {
+      expect(featureSpec(feature)?.systemPrompt?.trim()).toBeTruthy();
+    }
   });
 });

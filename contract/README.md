@@ -59,4 +59,9 @@ caminho, a suíte **falha** dizendo isso — ela não se ignora em silêncio.
 15. as regras da revisão de arte iguais nos dois serviços, frase a frase — a
     revisão roda pelo gateway com o prompt privilegiado daqui e pelo caminho
     legado com a mensagem que o Norman monta, e enquanto as duas cópias
-    discordavam a de sistema ganhava em silêncio.
+    discordavam a de sistema ganhava em silêncio;
+16. toda operação que o cliente do Norman consegue pedir autorizada ao
+    consumidor `norman` — `proof_review` faltava, e a falta não aparecia:
+    o pedido levava 403, o Norman caía no caminho legado com um aviso no log,
+    e a revisão de arte que a tela dizia rodar na conexão ativa rodava no
+    modelo local.
