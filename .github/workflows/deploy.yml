@@ -218,11 +218,14 @@ jobs:
             if [ -z "${arquivos}" ]; then
               echo "o pm2 nao informou caminho de log para llm-backend"
             else
-              echo "lendo: ${arquivos}"
-              existentes=""
-              for arquivo in ${arquivos}; do
-                if [ -f "${arquivo}" ]; then existentes="${existentes} ${arquivo}"; else echo "ausente: ${arquivo}"; fi
-              done
+              # A pasta inteira, e nao so os arquivos da instancia atual: o pm2
+              # numera o arquivo por instancia, e cada restart do deploy comeca
+              # um novo. O rastro da leitura que interessa fica no da instancia
+              # anterior.
+              pasta=$(dirname "${arquivos%% *}")
+              echo "lendo: ${pasta}/*.log"
+              existentes=$(ls -1 "${pasta}"/*.log 2>/dev/null | tr '\n' ' ')
+              if [ -n "${existentes}" ]; then echo "arquivos: ${existentes}"; fi
               if [ -z "${existentes}" ]; then
                 echo "nenhum arquivo de log existe nos caminhos acima"
               else
