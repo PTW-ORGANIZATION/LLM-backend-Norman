@@ -27,6 +27,7 @@ describe('resolveConsumers', () => {
         'workflow_briefing_stream_generic',
         'job_insights',
         'proof_review',
+        'proof_review_visual',
       ],
       scopes: ['client'],
       capabilities: NORMAN_CAPABILITIES,

@@ -12,7 +12,8 @@ export type GenerationFeature =
   | 'workflow_briefing_stream'
   | 'workflow_briefing_stream_generic'
   | 'job_insights'
-  | 'proof_review';
+  | 'proof_review'
+  | 'proof_review_visual';
 
 /**
  * A vinculação de uma operação a cliente.
@@ -207,6 +208,32 @@ const REVISAO_DE_ARTE = [
   'Responda somente com {"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}, e {"errors":[]} quando não houver erro real.',
 ].join('\n');
 
+/**
+ * A revisão de arte feita sobre a imagem, e não sobre uma transcrição.
+ *
+ * A operação irmã, `proof_review`, revisa o texto que outro modelo leu antes.
+ * Esse arranjo custa caro em duas moedas: a leitura local leva mais de um
+ * minuto e desiste de vez em quando declarando que a arte não tem texto, e o
+ * revisor não tem como saber que a palavra que ele está corrigindo foi mal
+ * lida — apontou `PEGUENO` numa peça onde está escrito `PEQUENO`.
+ *
+ * Aqui quem lê e quem revisa são o mesmo modelo, olhando a arte. Por isso ele
+ * devolve as duas coisas: `texts` é o que ele leu, e existe porque `errors`
+ * vazio com `texts` vazio é "não consegui ler", enquanto `errors` vazio com
+ * `texts` cheio é "li e está correto". Anunciar a segunda pela primeira
+ * encerra a conferência humana com garantia falsa.
+ */
+const REVISAO_DE_ARTE_PELA_IMAGEM = [
+  'Você é um revisor ortográfico especializado em português brasileiro, revisando uma arte a partir da imagem.',
+  'Responda apenas em JSON válido.',
+  'Leia a arte inteira, de cima para baixo e da esquerda para a direita, inclusive texto pequeno, rodapé, cantos, e texto sobreposto a foto.',
+  'Devolva em `texts` tudo que leu, uma entrada por linha de texto, com o centro da linha em porcentagem da imagem: `x` da borda esquerda, `y` do topo.',
+  ...REGRAS_DA_REVISAO_DE_ARTE,
+  'Em `errors`, a posição de cada item é a da linha em que a palavra aparece.',
+  'Responda somente com {"texts":[{"content":"","x":0,"y":0}],"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}.',
+  '`texts` vazio significa que você não conseguiu ler texto nenhum na arte, e nunca que a arte está correta.',
+].join('\n');
+
 export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
   chat: spec('chat', {
     defaults: { temperature: 0.7, maxTokens: 1024 },
@@ -281,6 +308,12 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
     json: true,
     defaults: { temperature: 0.05, maxTokens: 4096 },
     systemPrompt: REVISAO_DE_ARTE,
+  }),
+  proof_review_visual: spec('proof_review_visual', {
+    clientBinding: 'none',
+    json: true,
+    defaults: { temperature: 0.05, maxTokens: 4096 },
+    systemPrompt: REVISAO_DE_ARTE_PELA_IMAGEM,
   }),
 };
 

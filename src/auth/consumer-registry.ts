@@ -45,7 +45,7 @@ const NORMAN_CLIENT_BOUND_FEATURES: GenerationFeature[] = [
  * A tela dizia que a revisão usava a conexão ativa, a auditoria não registrava
  * execução nenhuma, e a revisão inteira acontecia no modelo local.
  */
-const NORMAN_STANDALONE_FEATURES: GenerationFeature[] = ['job_insights', 'proof_review'];
+const NORMAN_STANDALONE_FEATURES: GenerationFeature[] = ['job_insights', 'proof_review', 'proof_review_visual'];
 
 /**
  * As operações do consumidor `norman`, derivadas do próprio registro.

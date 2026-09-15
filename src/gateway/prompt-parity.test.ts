@@ -19,7 +19,7 @@ import { renderInsightsPrompt, renderWorkflowBriefingPrompt } from './feature-pa
  * que não sabe. Numa revisão de lista de textos não há esse risco, e a frase
  * seria ruído no meio de um contrato de saída em JSON.
  */
-const OPERACOES_SEM_CONVERSA = new Set<GenerationFeature>(['job_insights', 'proof_review']);
+const OPERACOES_SEM_CONVERSA = new Set<GenerationFeature>(['job_insights', 'proof_review', 'proof_review_visual']);
 
 describe('paridade dos prompts do gateway', () => {
   const chat = FEATURE_SPECS.chat.systemPrompt;
