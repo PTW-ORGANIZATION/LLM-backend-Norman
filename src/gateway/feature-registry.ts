@@ -1,3 +1,5 @@
+import { MAIOR_LADO_PARA_LEITURA } from '../vision/reduzir-arte';
+
 export type GenerationFeature =
   | 'chat'
   | 'chat_generic'
@@ -39,6 +41,15 @@ export interface FeatureSpec {
   /** Temperatura e teto de saída que esta operação pratica. */
   defaults: { temperature: number; maxTokens: number };
   systemPrompt: string;
+  /**
+   * O maior lado, em pixels, com que a imagem desta operação chega ao provedor.
+   *
+   * Operação que manda imagem sem declarar isto manda o arquivo como veio. Uma
+   * arte de dois mil pixels é fatiada em blocos pelo modelo, e o custo
+   * acompanha o número de blocos: a mesma peça a 1200 é lida em uma fração do
+   * tempo, com o título, o texto miúdo e a data igualmente legíveis.
+   */
+  maiorLadoDaImagem?: number;
 }
 
 const ISOLAMENTO = [
@@ -314,6 +325,7 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
     json: true,
     defaults: { temperature: 0.05, maxTokens: 4096 },
     systemPrompt: REVISAO_DE_ARTE_PELA_IMAGEM,
+    maiorLadoDaImagem: MAIOR_LADO_PARA_LEITURA,
   }),
 };
 

@@ -16,6 +16,8 @@ import { ProviderFailure, type LlmProvider } from './llm-provider.port';
 import { startIntegrationPostgres, type EmbeddedPostgres } from '../test/embedded-postgres';
 import { KNOWLEDGE_MIGRATIONS } from '../test/knowledge-migrations';
 import type { GenerateDto } from './generation.dto';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { MAIOR_LADO_PARA_LEITURA } from '../vision/reduzir-arte';
 
 const CLIENT = 'gw-acme';
 const OTHER_CLIENT = 'gw-rival';
@@ -1447,6 +1449,57 @@ describe('GenerationService', () => {
       const registro = (await executions())[0];
       expect(registro.connectionKey).toBe('ollama');
       expect(registro.clientId).toBe(CLIENT);
+    });
+  });
+
+  // A arte chega do consumidor no tamanho em que o usuário a enviou, e o
+  // consumidor não tem biblioteca de imagem para reduzi-la. O modelo fatia a
+  // imagem em blocos e o custo acompanha o número de blocos: sem este corte, a
+  // revisão de uma arte de dois mil pixels leva perto de um minuto.
+  describe('o tamanho da imagem entregue ao provedor', () => {
+    function arteDe(largura: number, altura: number): string {
+      const canvas = createCanvas(largura, altura);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#7fc4d4';
+      ctx.fillRect(0, 0, largura, altura);
+      return `data:image/jpeg;base64,${canvas.toBuffer('image/jpeg', 90).toString('base64')}`;
+    }
+
+    it('reduz a arte da revisão visual ao teto da operação', async () => {
+      const { service, generate } = buildService();
+
+      await service.generate(pedidoGenerico({
+        feature: 'proof_review_visual',
+        messages: [{ role: 'user', content: 'revise', images: [arteDe(2000, 1600)] }],
+      } as Partial<GenerateDto>));
+
+      const enviada = generate.mock.calls[0][1].messages.at(-1).images[0];
+      const decodificada = await loadImage(Buffer.from(enviada.slice(enviada.indexOf(',') + 1), 'base64'));
+      expect(Math.max(decodificada.width, decodificada.height)).toBe(MAIOR_LADO_PARA_LEITURA);
+    });
+
+    it('deixa passar a arte que já cabe no teto', async () => {
+      const { service, generate } = buildService();
+      const original = arteDe(900, 700);
+
+      await service.generate(pedidoGenerico({
+        feature: 'proof_review_visual',
+        messages: [{ role: 'user', content: 'revise', images: [original] }],
+      } as Partial<GenerateDto>));
+
+      expect(generate.mock.calls[0][1].messages.at(-1).images[0]).toBe(original);
+    });
+
+    it('não encosta na imagem de operação que não declara teto', async () => {
+      const { service, generate } = buildService();
+      const original = arteDe(2000, 1600);
+
+      await service.generate(pedidoGenerico({
+        feature: 'chat_generic',
+        messages: [{ role: 'user', content: 'olha isto', images: [original] }],
+      } as Partial<GenerateDto>));
+
+      expect(generate.mock.calls[0][1].messages.at(-1).images[0]).toBe(original);
     });
   });
 });

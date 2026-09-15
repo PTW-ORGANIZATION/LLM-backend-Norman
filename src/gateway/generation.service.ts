@@ -19,6 +19,7 @@ import {
 import { CLIENT_SCOPE, SYSTEM_SCOPE } from '../documents/knowledge-scope';
 import type { RetrievedChunk, SearchScope } from '../documents/document-chunks.service';
 import { OllamaService } from '../ollama/ollama.service';
+import { reduzirArteParaLeitura } from '../vision/reduzir-arte';
 import { GenerationExecution } from './generation-execution.entity';
 import { renderBrandTokensBlock, type BrandTokenSet } from './brand-tokens';
 import { featureSpec, type FeatureSpec } from './feature-registry';
@@ -353,7 +354,7 @@ export class GenerationService {
     const primary = resolved.connection;
     const model = resolved.record.model;
     const context = await this.buildContext(spec, dto, clientId);
-    const messages = this.composeMessages(spec, context.blocks, dto);
+    const messages = await this.composeMessages(spec, context.blocks, dto);
 
     return { dto, spec, primary, model, messages, context, revision: resolved.record };
   }
@@ -582,22 +583,54 @@ export class GenerationService {
    * que preserva o comportamento do caminho legado sem aceitar instrução
    * privilegiada vinda de quem chama.
    */
-  private composeMessages(
+  private async composeMessages(
     spec: FeatureSpec,
     blocks: string[],
     dto: GenerateDto,
-  ): GenerationMessage[] {
+  ): Promise<GenerationMessage[]> {
     const dinamico = this.dynamicPrompt(spec, dto);
+    const mensagensDoConsumidor = await Promise.all(dto.messages.map(async (message) => ({
+      role: message.role,
+      content: message.content,
+      ...(message.images?.length
+        ? { images: await this.imagensNoTamanhoDaOperacao(spec, message.images) }
+        : {}),
+    })));
     return [
       { role: 'system' as const, content: spec.systemPrompt },
       ...(dinamico ? [{ role: 'system' as const, content: dinamico }] : []),
       ...blocks.map((content) => ({ role: 'system' as const, content })),
-      ...dto.messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        ...(message.images?.length ? { images: message.images } : {}),
-      })),
+      ...mensagensDoConsumidor,
     ];
+  }
+
+  /**
+   * As imagens da mensagem no tamanho que a operação declara.
+   *
+   * Sem teto declarado a imagem segue como veio. Com teto, ela é reduzida aqui
+   * e não no consumidor: quem manda a imagem não tem biblioteca de imagem, e
+   * este é o último ponto antes de os bytes saírem para o provedor.
+   */
+  private async imagensNoTamanhoDaOperacao(spec: FeatureSpec, imagens: string[]): Promise<string[]> {
+    if (!spec.maiorLadoDaImagem) return imagens;
+
+    return Promise.all(imagens.map(async (dataUrl) => {
+      const separador = dataUrl.indexOf(',');
+      if (separador < 0) return dataUrl;
+
+      const arte = await reduzirArteParaLeitura(
+        Buffer.from(dataUrl.slice(separador + 1), 'base64'),
+        spec.maiorLadoDaImagem,
+      );
+      if (!arte.reduzida) return dataUrl;
+
+      this.logger.log(
+        `imagem reduzida para a operação [operacao=${spec.feature} `
+          + `de=${dataUrl.length - separador - 1} para=${arte.imagem.length} `
+          + `tamanho=${arte.largura}x${arte.altura}]`,
+      );
+      return `data:image/png;base64,${arte.imagem.toString('base64')}`;
+    }));
   }
 
   private dynamicPrompt(spec: FeatureSpec, dto: GenerateDto): string {
