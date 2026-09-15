@@ -64,4 +64,7 @@ caminho, a suíte **falha** dizendo isso — ela não se ignora em silêncio.
     consumidor `norman` — `proof_review` faltava, e a falta não aparecia:
     o pedido levava 403, o Norman caía no caminho legado com um aviso no log,
     e a revisão de arte que a tela dizia rodar na conexão ativa rodava no
-    modelo local.
+    modelo local;
+17. a condução do briefing e o fechamento pedido pelo usuário iguais nos dois
+    serviços, linha a linha — a conversa roda pelos dois caminhos e cada um
+    carrega a sua cópia do texto.

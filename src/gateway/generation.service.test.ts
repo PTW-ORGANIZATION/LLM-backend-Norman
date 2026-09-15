@@ -1452,6 +1452,52 @@ describe('GenerationService', () => {
     });
   });
 
+  // A conducao pergunta ate o modelo julgar os seis campos suficientes, e e ele
+  // quem julga o que e "muito vago". O pedido de fechar devolve essa decisao a
+  // quem esta escrevendo, por um botao na tela.
+  describe('o fechamento do briefing pedido pelo usuário', () => {
+    it('acrescenta a instrução de fechar à conversa', async () => {
+      const { service, generate } = buildService();
+
+      await service.generate(pedidoGenerico({ fecharBriefingAgora: true } as Partial<GenerateDto>));
+
+      const sistema = generate.mock.calls[0][1].messages
+        .filter((m: any) => m.role === 'system')
+        .map((m: any) => m.content)
+        .join('\n');
+      expect(sistema).toContain('Nao faca mais perguntas nesta resposta.');
+      expect(sistema).toContain('a definir');
+    });
+
+    it('não acrescenta nada quando a conversa segue normal', async () => {
+      const { service, generate } = buildService();
+
+      await service.generate(pedidoGenerico());
+
+      const sistema = generate.mock.calls[0][1].messages
+        .filter((m: any) => m.role === 'system')
+        .map((m: any) => m.content)
+        .join('\n');
+      expect(sistema).not.toContain('Nao faca mais perguntas nesta resposta.');
+    });
+
+    it('não vale para operação que não é conversa', async () => {
+      const { service, generate } = buildService();
+
+      await service.generate(pedidoGenerico({
+        feature: 'job_insights',
+        fecharBriefingAgora: true,
+        briefingFramework: { objective: 'vender' },
+      } as Partial<GenerateDto>));
+
+      const sistema = generate.mock.calls[0][1].messages
+        .filter((m: any) => m.role === 'system')
+        .map((m: any) => m.content)
+        .join('\n');
+      expect(sistema).not.toContain('Nao faca mais perguntas nesta resposta.');
+    });
+  });
+
   // A arte chega do consumidor no tamanho em que o usuário a enviou, e o
   // consumidor não tem biblioteca de imagem para reduzi-la. O modelo fatia a
   // imagem em blocos e o custo acompanha o número de blocos: sem este corte, a

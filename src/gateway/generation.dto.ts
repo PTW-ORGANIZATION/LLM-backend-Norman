@@ -422,6 +422,17 @@ export class GenerateDto {
   @Type(() => WorkflowBriefingDto)
   workflowBriefing?: WorkflowBriefingDto;
 
+  /**
+   * A pessoa pediu para gerar o briefing agora, com o que já foi conversado.
+   *
+   * O campo é opcional, e não uma versão nova do contrato: consumidor que não
+   * o manda continua sendo conduzido pelas perguntas, e o executor sobe antes
+   * do consumidor sem janela quebrada.
+   */
+  @IsOptional()
+  @IsBoolean()
+  fecharBriefingAgora?: boolean;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => BriefingFrameworkDto)

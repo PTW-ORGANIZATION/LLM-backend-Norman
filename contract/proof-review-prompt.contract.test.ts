@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { NORMAN_FEATURES } from '../src/auth/consumer-registry';
+import {
+  CONDUCAO_DO_BRIEFING as CONDUCAO_DO_EXECUTOR,
+  FECHAMENTO_PEDIDO_PELO_USUARIO as FECHAMENTO_DO_EXECUTOR,
+} from '../src/gateway/feature-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_EXECUTOR, featureSpec } from '../src/gateway/feature-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_NORMAN } from '@norman/lib/proof-review-rules';
 import { GATEWAY_FEATURES } from '@norman/modules/ai/llm-gateway.client';
+import {
+  CONDUCAO_DO_BRIEFING as CONDUCAO_DO_NORMAN,
+  FECHAMENTO_PEDIDO_PELO_USUARIO as FECHAMENTO_DO_NORMAN,
+} from '@norman/lib/briefing-conduction';
 
 /**
  * As regras da revisão de arte, comparadas entre os dois serviços.
@@ -61,6 +69,43 @@ describe('as operações que o Norman pede e as que o executor autoriza', () => 
   it('todas têm prompt privilegiado declarado', () => {
     for (const feature of GATEWAY_FEATURES) {
       expect(featureSpec(feature)?.systemPrompt?.trim()).toBeTruthy();
+    }
+  });
+});
+
+/**
+ * A condução do briefing, comparada entre os dois serviços.
+ *
+ * A conversa roda pelos dois caminhos — o gateway, com o prompt privilegiado
+ * daqui, e o legado, com a mensagem que o Norman monta — e cada um carrega a
+ * sua cópia. O texto era idêntico por disciplina, e foi a mesma disciplina que
+ * falhou na revisão de arte: um lado mandava copiar a linha, o outro pedia a
+ * palavra, e a mensagem de sistema ganhou sem que nada acusasse.
+ */
+describe('a condução do briefing nos dois serviços', () => {
+  it('é a mesma, linha a linha e na mesma ordem', () => {
+    expect(CONDUCAO_DO_EXECUTOR).toEqual(CONDUCAO_DO_NORMAN);
+  });
+
+  it('o fechamento pedido pelo usuário também', () => {
+    expect(FECHAMENTO_DO_EXECUTOR).toEqual(FECHAMENTO_DO_NORMAN);
+  });
+
+  // Sem isto o pedido de fechar vira mais uma pergunta, que é o que ele existe
+  // para evitar; e o campo vazio vira invenção, que é pior do que o buraco.
+  it('o fechamento proíbe nova pergunta e nomeia o campo sem resposta', () => {
+    const texto = FECHAMENTO_DO_EXECUTOR.join('\n');
+
+    expect(texto).toContain('Nao faca mais perguntas');
+    expect(texto).toContain('a definir');
+    expect(texto).toContain('BRIEFING_READY:');
+  });
+
+  it('chega inteiro ao prompt privilegiado da conversa', () => {
+    const sistema = featureSpec('chat')!.systemPrompt;
+
+    for (const linha of CONDUCAO_DO_EXECUTOR) {
+      expect(sistema).toContain(linha);
     }
   });
 });

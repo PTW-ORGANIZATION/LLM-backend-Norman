@@ -22,7 +22,7 @@ import { OllamaService } from '../ollama/ollama.service';
 import { reduzirArteParaLeitura } from '../vision/reduzir-arte';
 import { GenerationExecution } from './generation-execution.entity';
 import { renderBrandTokensBlock, type BrandTokenSet } from './brand-tokens';
-import { featureSpec, type FeatureSpec } from './feature-registry';
+import { FECHAMENTO_PEDIDO_PELO_USUARIO, featureSpec, type FeatureSpec } from './feature-registry';
 import { renderInsightsPrompt, renderWorkflowBriefingPrompt } from './feature-payloads';
 import { decideFallback, FALLBACK_DISABLED, type FallbackPolicy } from './fallback-policy';
 import {
@@ -634,6 +634,9 @@ export class GenerationService {
   }
 
   private dynamicPrompt(spec: FeatureSpec, dto: GenerateDto): string {
+    if (dto.fecharBriefingAgora && spec.feature.startsWith('chat')) {
+      return FECHAMENTO_PEDIDO_PELO_USUARIO.join('\n');
+    }
     if (spec.feature.startsWith('workflow_briefing')) {
       if (!dto.workflowBriefing) {
         throw new BadRequestException(
