@@ -196,10 +196,40 @@ jobs:
             # da janela assim que o servico registra qualquer outra coisa. O
             # arquivo sobrevive ao restart do deploy, entao o rastro nao se
             # perde -- ao contrario do container do Norman, que e recriado.
+            #
+            # O caminho vem do proprio pm2, e nao chutado do ecosystem: na
+            # primeira versao desta checagem ele foi chutado, o arquivo nao
+            # existia, o `2>/dev/null` engoliu o erro e a checagem anunciou
+            # "nenhuma leitura registrada" para um servico que tinha acabado de
+            # transcrever uma arte. Dizer que os arquivos nao foram achados e
+            # diferente de dizer que nada foi lido.
             echo "::group::Ultimas leituras de arte"
-            leituras=$(grep -ah "transcricao \[\|transcrição \[\|Visão não devolveu texto\|Visao nao devolveu texto" \
-              logs/out.log logs/error.log 2>/dev/null | tail -15)
-            if [ -n "${leituras}" ]; then echo "${leituras}"; else echo "nenhuma leitura registrada"; fi
+            arquivos=$(pm2 jlist 2>/dev/null | node -e '
+              let bruto = "";
+              process.stdin.on("data", (p) => { bruto += p; });
+              process.stdin.on("end", () => {
+                try {
+                  const apps = JSON.parse(bruto).filter((a) => a.name === "llm-backend");
+                  const caminhos = apps.flatMap((a) => [a.pm2_env.pm_out_log_path, a.pm2_env.pm_err_log_path]);
+                  console.log(caminhos.filter(Boolean).join(" "));
+                } catch { console.log(""); }
+              });
+            ')
+            if [ -z "${arquivos}" ]; then
+              echo "o pm2 nao informou caminho de log para llm-backend"
+            else
+              echo "lendo: ${arquivos}"
+              existentes=""
+              for arquivo in ${arquivos}; do
+                if [ -f "${arquivo}" ]; then existentes="${existentes} ${arquivo}"; else echo "ausente: ${arquivo}"; fi
+              done
+              if [ -z "${existentes}" ]; then
+                echo "nenhum arquivo de log existe nos caminhos acima"
+              else
+                leituras=$(grep -ah "transcricao \[\|transcrição \[\|Visão não devolveu texto\|Visao nao devolveu texto" ${existentes} | tail -15)
+                if [ -n "${leituras}" ]; then echo "${leituras}"; else echo "os arquivos existem e nenhuma linha de leitura casou"; fi
+              fi
+            fi
             echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \
