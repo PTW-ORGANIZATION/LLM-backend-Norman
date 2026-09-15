@@ -34,6 +34,20 @@ try {
   console.log('documentos por situacao: '
     + (porStatus.map((linha) => `${linha.status}=${linha.total}`).join(' ') || 'nenhum'));
 
+  const { rows: pendentes } = await cliente.query(
+    `SELECT d.filename, d.updated_at
+       FROM documents d
+      WHERE d.status = 'pending'
+      ORDER BY d.updated_at
+      LIMIT 10`,
+  );
+  if (pendentes.length > 0) {
+    console.log(`NUNCA COMECARAM A SER LIDOS: ${pendentes.length}`);
+    for (const linha of pendentes) {
+      console.log(`  ${linha.filename} — parado ha ${emDias(linha.updated_at)} dia(s)`);
+    }
+  }
+
   const { rows: [parados] } = await cliente.query(
     `SELECT COUNT(*)::int AS total, MIN(d.updated_at) AS mais_antigo
        FROM documents d

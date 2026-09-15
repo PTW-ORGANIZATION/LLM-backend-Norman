@@ -37,6 +37,7 @@ import {
   RevocationStateDto,
 } from './internal-documents.dto';
 import { CLIENT_SCOPE, IngestionScope, SYSTEM_SCOPE } from '../documents/knowledge-scope';
+import { enfileirarLiberandoOId } from '../queue/enfileirar';
 
 /**
  * O nível declarado no pedido, com `client` como ausência.
@@ -110,7 +111,8 @@ export class InternalDocumentsController {
 
     // O `jobId` é o par documento + conteúdo: uma segunda chamada com o mesmo
     // sha256 reaproveita o job que já está na fila em vez de duplicar trabalho.
-    await this.ingestionQueue.add(
+    await enfileirarLiberandoOId(
+      this.ingestionQueue,
       'ingest-document',
       {
         documentId: document.id,
@@ -126,7 +128,7 @@ export class InternalDocumentsController {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 1000,
-        removeOnFail: 5000,
+        removeOnFail: true,
       },
     );
 
