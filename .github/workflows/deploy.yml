@@ -262,6 +262,38 @@ jobs:
             # estudo falhou de vez, ele ficava assim sem nada que o tirasse de
             # la. Ninguem percebia o acumulo ate alguem reparar na tela dias
             # depois.
+            # O modelo da revisao de arte gasta cinco mil tokens de raciocinio
+            # para achar um erro de ortografia, e e esse raciocinio -- nao a
+            # leitura, nem a escrita -- que responde por quase toda a espera.
+            # Trocar por um modelo que raciocina menos depende de saber o que a
+            # chave alcanca, e ate aqui isso era palpite. A chave nunca e
+            # impressa; so os nomes do catalogo.
+            echo "::group::Catalogo do provedor Grok"
+            catalogo=$(curl -s --max-time 20 \
+              -H "Authorization: Bearer ${{ secrets.GROK_API_KEY }}" \
+              "${{ secrets.GROK_BASE_URL }}/models")
+            resultado=$?
+            if [ ${resultado} -ne 0 ]; then
+              echo "o catalogo nao respondeu (curl saiu com ${resultado})"
+            elif [ -z "${catalogo}" ]; then
+              echo "o catalogo respondeu vazio"
+            else
+              printf '%s' "${catalogo}" | node -e '
+                let bruto = "";
+                process.stdin.on("data", (p) => { bruto += p; });
+                process.stdin.on("end", () => {
+                  try {
+                    const lista = JSON.parse(bruto).data || [];
+                    if (lista.length === 0) { console.log("o catalogo veio sem modelo nenhum"); return; }
+                    for (const modelo of lista) console.log(`  ${modelo.id}`);
+                  } catch {
+                    console.log("o catalogo nao veio em JSON; primeiros caracteres:");
+                    console.log(bruto.slice(0, 200));
+                  }
+                });
+              '
+            fi
+            echo "::endgroup::"
             echo "::group::Estudos parados"
             DB_HOST="${{ secrets.DB_HOST }}" DB_PORT="${{ secrets.DB_PORT }}" \
               DB_USERNAME="${{ secrets.DB_USERNAME }}" DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
