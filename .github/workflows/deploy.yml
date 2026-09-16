@@ -251,7 +251,7 @@ jobs:
               if [ -z "${existentes}" ]; then
                 echo "nenhum arquivo de log existe nos caminhos acima"
               else
-                leituras=$(grep -ah "transcricao \[\|transcrição \[\|Visão não devolveu texto\|Visao nao devolveu texto" ${existentes} | tail -15)
+                leituras=$(grep -ah "transcricao \[\|transcrição \[\|Visão não devolveu texto\|Visao nao devolveu texto\|imagem reduzida\|pedido montado" ${existentes} | tail -25)
                 if [ -n "${leituras}" ]; then echo "${leituras}"; else echo "os arquivos existem e nenhuma linha de leitura casou"; fi
               fi
             fi

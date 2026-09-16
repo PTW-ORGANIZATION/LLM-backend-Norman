@@ -258,20 +258,29 @@ const REVISAO_DE_ARTE = [
  * lida — apontou `PEGUENO` numa peça onde está escrito `PEQUENO`.
  *
  * Aqui quem lê e quem revisa são o mesmo modelo, olhando a arte. Por isso ele
- * devolve as duas coisas: `texts` é o que ele leu, e existe porque `errors`
+ * devolve as duas coisas: `texts` é prova de leitura, e existe porque `errors`
  * vazio com `texts` vazio é "não consegui ler", enquanto `errors` vazio com
  * `texts` cheio é "li e está correto". Anunciar a segunda pela primeira
  * encerra a conferência humana com garantia falsa.
+ *
+ * `texts` é prova, e não transcrição. Enquanto ele pedia a arte inteira de
+ * volta, a operação escrevia cerca de trezentos e sessenta tokens por peça a
+ * sete tokens por segundo — a transcrição, e não a revisão, era quase toda a
+ * espera de quase um minuto. Duas entradas provam a leitura tão bem quanto
+ * trinta: a linha mais destacada da peça, que só existe se ele enxergou a
+ * arte, e a linha de cada erro apontado, que é de onde sai a posição do
+ * alfinete. A ordem de ler tudo continua, porque é dela que vem o erro achado
+ * no rodapé; o que sai é a obrigação de digitar tudo de volta.
  */
 const REVISAO_DE_ARTE_PELA_IMAGEM = [
   'Você é um revisor ortográfico especializado em português brasileiro, revisando uma arte a partir da imagem.',
   'Responda apenas em JSON válido.',
   'Leia a arte inteira, de cima para baixo e da esquerda para a direita, inclusive texto pequeno, rodapé, cantos, e texto sobreposto a foto.',
-  'Devolva em `texts` tudo que leu, uma entrada por linha de texto, com o centro da linha em porcentagem da imagem: `x` da borda esquerda, `y` do topo.',
+  'Não transcreva a arte na resposta. Em `texts` vão só a linha mais destacada da peça e a linha de cada erro que você apontar, com o centro da linha em porcentagem da imagem: `x` da borda esquerda, `y` do topo.',
   ...REGRAS_DA_REVISAO_DE_ARTE,
   'Em `errors`, a posição de cada item é a da linha em que a palavra aparece.',
   'Responda somente com {"texts":[{"content":"","x":0,"y":0}],"errors":[{"text":"","error":"","suggestion":"","x":0,"y":0}]}.',
-  '`texts` vazio significa que você não conseguiu ler texto nenhum na arte, e nunca que a arte está correta.',
+  'A linha mais destacada vai em `texts` mesmo quando não houver erro nenhum: `texts` vazio significa que você não conseguiu ler texto nenhum na arte, e nunca que a arte está correta.',
 ].join('\n');
 
 export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
