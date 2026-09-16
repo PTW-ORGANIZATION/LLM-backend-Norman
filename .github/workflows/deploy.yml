@@ -137,6 +137,18 @@ jobs:
             # usuário certo. Só código HTTP e linhas de log: nenhum valor de
             # secret é impresso.
             set +e
+            # Chave escrita vazia nao derruba nada na hora: o servico sobe, e o
+            # que dependia dela falha depois, longe daqui. Foi assim com
+            # INTERNAL_API_TOKEN em 03/09. As obrigatorias ja derrubam o deploy
+            # acima; estas sao as que so somem em silencio.
+            echo "::group::Chaves do .env que ficaram vazias"
+            vazias=$(grep -E '^[A-Z_]+=$' .env | cut -d= -f1 | tr '\n' ' ')
+            if [ -n "${vazias}" ]; then
+              echo "::warning::chaves vazias no .env do servidor: ${vazias}"
+            else
+              echo "nenhuma chave do .env ficou vazia"
+            fi
+            echo "::endgroup::"
             echo "::group::Processos e portas"
             pm2 list
             ss -ltn 2>/dev/null | grep -E ':3000|:3001' || echo "sem ss disponivel"
