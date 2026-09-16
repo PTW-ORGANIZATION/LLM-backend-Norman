@@ -179,6 +179,8 @@ export class GenerationService {
     for (let attempt = 1; attempt <= Math.max(1, policy.maxAttempts); attempt += 1) {
       const startedAt = Date.now();
       let streamed = false;
+      let primeiraLetraMs: number | null = null;
+      let caracteres = 0;
       let promptTokens: number | null = null;
       let completionTokens: number | null = null;
 
@@ -195,7 +197,9 @@ export class GenerationService {
 
         for await (const event of events) {
           if (event.kind === 'delta') {
+            if (!streamed) primeiraLetraMs = Date.now() - startedAt;
             streamed = true;
+            caracteres += event.text.length;
             yield { type: 'delta', text: event.text };
             continue;
           }
@@ -215,6 +219,15 @@ export class GenerationService {
           fallbackOf,
         };
         attempts.push(report);
+        // Numa resposta em fluxo, a duração inteira não é o que a pessoa
+        // espera: ela já está lendo desde a primeira letra. É a primeira letra
+        // que decide se a tela parece rápida, e `duration_ms` não a distingue
+        // de uma resposta longa que começou na hora.
+        this.logger.log(
+          `fluxo entregue [operacao=${dto.feature} correlacao=${dto.correlationId} `
+            + `primeiraLetra=${primeiraLetraMs ?? '-'}ms total=${report.durationMs}ms `
+            + `caracteres=${caracteres}]`,
+        );
         await this.record(dto, report, prepared.context, promptTokens, completionTokens, currentRevision);
 
         yield {
