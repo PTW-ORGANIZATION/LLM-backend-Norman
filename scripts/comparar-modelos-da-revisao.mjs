@@ -26,15 +26,15 @@ const ERROS_PLANTADOS = ['SELEBRAR', 'FASER', 'AMINHO'];
 const ARTE = 'src/ingestion/extraction/__fixtures__/imagem-arte-colorida.png';
 const SUFIXO = process.env.SUFIXO_SEM_RACIOCINIO || '-0309-non-reasoning';
 
-function registroDeOperacoes() {
-  for (const caminho of ['../dist/src/gateway/feature-registry.js', '../dist/gateway/feature-registry.js']) {
+function doBuild(modulo) {
+  for (const base of ['../dist/src/gateway/', '../dist/gateway/']) {
     try {
-      return require(caminho);
+      return require(`${base}${modulo}.js`);
     } catch {
       continue;
     }
   }
-  throw new Error('o build nao tem o registro de operacoes; rode npm run build antes');
+  throw new Error(`o build nao tem ${modulo}; rode npm run build antes`);
 }
 
 async function medir({ baseUrl, apiKey, modelo, spec, imagem }) {
@@ -105,10 +105,25 @@ if (!baseUrl || !apiKey || !modelo) {
 }
 
 try {
-  const spec = registroDeOperacoes().featureSpec('proof_review_visual');
+  const spec = doBuild('feature-registry').featureSpec('proof_review_visual');
   if (!spec) throw new Error('a operacao proof_review_visual nao existe neste build');
 
   const imagem = (await readFile(path.resolve(process.cwd(), ARTE))).toString('base64');
+
+  // A comparacao decide se vale trocar; esta linha decide se a troca ja esta
+  // valendo. O gateway so executa a variante que a conexao permite, e a
+  // checagem aqui e a mesma funcao que ele usa -- nao uma imitacao dela.
+  const permitidos = (process.env.GROK_ALLOWED_MODELS || '')
+    .split(',').map((m) => m.trim()).filter(Boolean);
+  const emUso = doBuild('provider-connection').modeloSemRaciocinio(
+    modelo,
+    permitidos.includes(modelo) ? permitidos : [modelo, ...permitidos],
+  );
+  console.log(emUso
+    ? 'a conexao ja permite a variante sem raciocinio; a revisao de arte executa nela'
+    : `a conexao NAO permite variante sem raciocinio: a revisao de arte segue no modelo da revisao. `
+      + `Para ativar, acrescente a GROK_ALLOWED_MODELS o id "${modelo}${SUFIXO}"`);
+  console.log('');
 
   console.log(`arte de controle com ${ERROS_PLANTADOS.length} erros plantados, prompt real da operacao:`);
   linha('modelo de hoje', await medir({ baseUrl, apiKey, modelo, spec, imagem }));

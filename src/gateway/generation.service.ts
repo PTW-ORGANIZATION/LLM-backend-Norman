@@ -34,7 +34,7 @@ import {
 import type { GenerationStreamEvent } from './generation-stream.contract';
 import { LLM_PROVIDER } from './llm-provider.token';
 import { ConnectionRevisionsService } from './connection-revisions.service';
-import { resolveConnection, type ResolvedConnection } from './provider-connection';
+import { modeloSemRaciocinio, resolveConnection, type ResolvedConnection } from './provider-connection';
 import type { GenerateDto } from './generation.dto';
 
 export interface GenerationAttemptReport {
@@ -366,7 +366,7 @@ export class GenerationService {
     });
 
     const primary = resolved.connection;
-    const model = resolved.record.model;
+    const model = this.modeloDaOperacao(spec, primary, resolved.record.model);
     const context = await this.buildContext(spec, dto, clientId);
     const messages = await this.composeMessages(spec, context.blocks, dto);
 
@@ -379,6 +379,32 @@ export class GenerationService {
     );
 
     return { dto, spec, primary, model, messages, context, revision: resolved.record };
+  }
+
+  /**
+   * O modelo que esta operação executa, entre os que a conexão permite.
+   *
+   * A revisão continua mandando: é o modelo dela que serve de base, e a
+   * variante só entra se a própria conexão já a permitir. O que se executa é o
+   * que fica gravado na auditoria — nunca a base, quando a variante entrou.
+   */
+  private modeloDaOperacao(
+    spec: FeatureSpec,
+    connection: Extract<ResolvedConnection, { available: true }>,
+    modeloDaRevisao: string,
+  ): string {
+    if (!spec.dispensaRaciocinio) return modeloDaRevisao;
+
+    const variante = modeloSemRaciocinio(modeloDaRevisao, connection.allowedModels);
+    if (!variante) {
+      this.logger.log(
+        `a operação ${spec.feature} dispensa raciocínio, e a conexão ${connection.key} não `
+          + 'permite nenhuma variante sem ele; segue no modelo da revisão',
+      );
+      return modeloDaRevisao;
+    }
+
+    return variante;
   }
 
   private declaresClientScope(dto: GenerateDto): boolean {

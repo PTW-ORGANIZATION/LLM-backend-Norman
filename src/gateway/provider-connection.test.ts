@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listConnections, resolveConnection, validateBaseUrl } from './provider-connection';
+import { listConnections, modeloSemRaciocinio, resolveConnection, validateBaseUrl } from './provider-connection';
 
 describe('validateBaseUrl', () => {
   it.each([
@@ -127,5 +127,43 @@ describe('resolveConnection', () => {
 
     expect(chaves).toEqual(['ollama', 'openai', 'grok']);
     expect(listConnections({}).filter((connection) => connection.available)).toHaveLength(1);
+  });
+});
+
+// Raciocínio é cobrado em tempo: achar `SELEBRAR` numa arte custava seis mil
+// tokens de raciocínio e sessenta segundos, contra um e sete da mesma família
+// sem raciocínio, com os mesmos três erros plantados encontrados.
+describe('modeloSemRaciocinio', () => {
+  it('acha a variante sem raciocínio do modelo pedido', () => {
+    expect(modeloSemRaciocinio('grok-4.20', [
+      'grok-4.20',
+      'grok-4.20-0309-non-reasoning',
+      'grok-4.20-0309-reasoning',
+    ])).toBe('grok-4.20-0309-non-reasoning');
+  });
+
+  // A allowlist é a trava inteira: sem a variante permitida, a operação segue
+  // no modelo da revisão em vez de alcançar um modelo que ninguém aprovou.
+  it('não inventa variante que a conexão não permite', () => {
+    expect(modeloSemRaciocinio('grok-4.20', ['grok-4.20'])).toBeNull();
+    expect(modeloSemRaciocinio('grok-4.20', [])).toBeNull();
+  });
+
+  it('não devolve variante de outro modelo', () => {
+    expect(modeloSemRaciocinio('grok-4.20', ['grok-4.5-0309-non-reasoning'])).toBeNull();
+  });
+
+  it('não devolve a variante que raciocina', () => {
+    expect(modeloSemRaciocinio('grok-4.20', ['grok-4.20-0309-reasoning'])).toBeNull();
+  });
+
+  it('não devolve o próprio modelo quando ele já termina em non-reasoning', () => {
+    const permitidos = ['grok-4.20-non-reasoning'];
+
+    expect(modeloSemRaciocinio('grok-4.20-non-reasoning', permitidos)).toBeNull();
+  });
+
+  it('modelo vazio não escolhe nada', () => {
+    expect(modeloSemRaciocinio('  ', ['grok-4.20-0309-non-reasoning'])).toBeNull();
   });
 });

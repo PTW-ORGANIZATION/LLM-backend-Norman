@@ -1577,6 +1577,91 @@ describe('GenerationService', () => {
       expect(Math.max(decodificada.width, decodificada.height)).toBe(MAIOR_LADO_PARA_LEITURA);
     });
 
+    // Raciocínio é cobrado em tempo, e esta operação não precisa dele: achar
+    // `SELEBRAR` numa arte custava seis mil tokens de raciocínio e sessenta
+    // segundos, contra um e sete da mesma família sem raciocínio, achando os
+    // mesmos três erros plantados.
+    describe('o modelo que a revisão de arte executa', () => {
+      const comVariante = 'llama-local,llama-local-0309-non-reasoning';
+
+      // A revisão carrega o digest do provisionamento, e a allowlist entra
+      // nele: a revisão tem que nascer depois da troca, senão ela é recusada
+      // por ter sido reconhecida sobre outra configuração — que é exatamente o
+      // que ela existe para garantir.
+      async function comAllowlist<T>(valor: string, corpo: () => Promise<T>): Promise<T> {
+        const anterior = process.env.OLLAMA_ALLOWED_MODELS;
+        process.env.OLLAMA_ALLOWED_MODELS = valor;
+        await dataSource.query(`DELETE FROM connection_activations`);
+        await dataSource.query(`DELETE FROM connection_revisions`);
+        await seedRevisions();
+
+        try {
+          return await corpo();
+        } finally {
+          if (anterior === undefined) delete process.env.OLLAMA_ALLOWED_MODELS;
+          else process.env.OLLAMA_ALLOWED_MODELS = anterior;
+        }
+      }
+
+      it('executa a variante sem raciocínio quando a conexão a permite', async () => {
+        await comAllowlist(comVariante, async () => {
+          const { service, generate } = buildService();
+
+          const outcome = await service.generate(pedidoGenerico({
+            feature: 'proof_review_visual',
+            messages: [{ role: 'user', content: 'revise', images: [arteDe(900, 700)] }],
+          } as Partial<GenerateDto>));
+
+          expect(generate.mock.calls[0][1].model).toBe('llama-local-0309-non-reasoning');
+          expect(outcome.usedModel).toBe('llama-local-0309-non-reasoning');
+        });
+      });
+
+      // A allowlist é a trava: sem a variante permitida, a operação segue no
+      // modelo que a revisão fixou, e não num modelo que ninguém aprovou.
+      it('segue no modelo da revisão quando a conexão não permite variante', async () => {
+        await comAllowlist('llama-local,llama-grande', async () => {
+          const { service, generate } = buildService();
+
+          await service.generate(pedidoGenerico({
+            feature: 'proof_review_visual',
+            messages: [{ role: 'user', content: 'revise', images: [arteDe(900, 700)] }],
+          } as Partial<GenerateDto>));
+
+          expect(generate.mock.calls[0][1].model).toBe('llama-local');
+        });
+      });
+
+      // A auditoria precisa dizer o que executou, e não o que a revisão fixou:
+      // é ela que responde por onde os dados do cliente passaram.
+      it('a auditoria grava a variante que de fato executou', async () => {
+        await comAllowlist(comVariante, async () => {
+          const { service } = buildService();
+
+          await service.generate(pedidoGenerico({
+            feature: 'proof_review_visual',
+            correlationId: 'corr-variante',
+            messages: [{ role: 'user', content: 'revise', images: [arteDe(900, 700)] }],
+          } as Partial<GenerateDto>));
+
+          const linha = await dataSource.getRepository(GenerationExecution).findOne({
+            where: { correlationId: 'corr-variante' },
+          });
+          expect(linha?.model).toBe('llama-local-0309-non-reasoning');
+        });
+      });
+
+      it('as demais operações não trocam de modelo', async () => {
+        await comAllowlist(comVariante, async () => {
+          const { service, generate } = buildService();
+
+          await service.generate(pedidoGenerico({ feature: 'chat_generic' }));
+
+          expect(generate.mock.calls[0][1].model).toBe('llama-local');
+        });
+      });
+    });
+
     // A URL de dados precisa declarar o que ela de fato carrega: o provedor lê
     // o tipo dali, e anunciar PNG para bytes JPEG é entregar uma imagem que ele
     // recusa a decodificar.

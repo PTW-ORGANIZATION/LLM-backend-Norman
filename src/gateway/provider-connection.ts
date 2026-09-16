@@ -125,6 +125,32 @@ function allowedModelsOf(spec: ProviderSpec, source: EnvSource, defaultModel: st
 }
 
 /**
+ * A variante do mesmo modelo que não raciocina, entre as que a conexão permite.
+ *
+ * Existe porque raciocínio é cobrado em tempo, e há operação que não precisa
+ * dele: para achar `SELEBRAR` numa arte, o modelo gastava seis mil tokens
+ * raciocinando e escrevia duzentos de resposta — sessenta segundos contra um e
+ * sete da mesma família sem raciocínio, achando os mesmos três erros plantados.
+ *
+ * A escolha sai da allowlist, e só dela. Nada aqui inventa nome de modelo nem
+ * amplia o que a conexão alcança: quem não quiser a variante basta não
+ * permiti-la. E a busca é por forma, não por versão fixa — o sufixo da família
+ * muda a cada modelo novo, e um nome cravado no código envelheceria calado.
+ *
+ * @returns o id da variante, ou `null` quando a conexão não permite nenhuma
+ */
+export function modeloSemRaciocinio(modelo: string, permitidos: readonly string[]): string | null {
+  const pedido = String(modelo || '').trim();
+  if (!pedido) return null;
+
+  return permitidos.find((candidato) => (
+    candidato !== pedido
+    && candidato.startsWith(pedido)
+    && candidato.endsWith('non-reasoning')
+  )) ?? null;
+}
+
+/**
  * A conexão provisionada de uma chave, ou o motivo de ela não estar disponível.
  *
  * Nunca lança e nunca inventa: ausência de configuração aparece como

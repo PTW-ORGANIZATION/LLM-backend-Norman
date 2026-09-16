@@ -301,6 +301,7 @@ jobs:
             GROK_BASE_URL="${{ secrets.GROK_BASE_URL }}" \
               GROK_API_KEY="${{ secrets.GROK_API_KEY }}" \
               GROK_MODEL="${{ secrets.GROK_MODEL }}" \
+              GROK_ALLOWED_MODELS="${{ secrets.GROK_ALLOWED_MODELS }}" \
               node scripts/comparar-modelos-da-revisao.mjs
             echo "::endgroup::"
             echo "::group::Estudos parados"

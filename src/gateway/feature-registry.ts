@@ -50,6 +50,19 @@ export interface FeatureSpec {
    * tempo, com o título, o texto miúdo e a data igualmente legíveis.
    */
   maiorLadoDaImagem?: number;
+  /**
+   * Se esta operação abre mão do raciocínio do modelo.
+   *
+   * Raciocínio é cobrado em tempo, e nem toda operação precisa dele. Achar
+   * `SELEBRAR` numa arte custava seis mil tokens de raciocínio para duzentos de
+   * resposta — sessenta segundos, contra um e sete da mesma família sem
+   * raciocínio, com os mesmos três erros plantados encontrados.
+   *
+   * Declarar isto é um pedido, não uma ordem: a variante só entra se a conexão
+   * ativa já a permitir. Onde ela não existir, a operação segue no modelo que a
+   * revisão fixou.
+   */
+  dispensaRaciocinio?: boolean;
 }
 
 const ISOLAMENTO = [
@@ -364,6 +377,9 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
     defaults: { temperature: 0.05, maxTokens: 4096 },
     systemPrompt: REVISAO_DE_ARTE_PELA_IMAGEM,
     maiorLadoDaImagem: MAIOR_LADO_PARA_LEITURA,
+    // Comparadas sobre a arte de controle, com o prompt desta operação: as
+    // duas acharam SELEBRAR, FASER e AMINHO; uma levou 60,7 s e a outra 1,7 s.
+    dispensaRaciocinio: true,
   }),
 };
 
