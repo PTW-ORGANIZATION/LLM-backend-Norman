@@ -215,6 +215,16 @@ jobs:
               DB_DATABASE="${{ secrets.DB_DATABASE }}" \
               node scripts/estudos-parados.mjs
             echo "::endgroup::"
+            # Onde o tempo das frentes de IA e gasto de verdade. A tela mostra
+            # o total; esta medicao separa a parte que e o provedor escrevendo
+            # da parte que e o gateway montando o pedido -- consertos
+            # diferentes, e ate aqui a escolha entre eles era palpite.
+            echo "::group::Tempos das frentes de IA"
+            DB_HOST="${{ secrets.DB_HOST }}" DB_PORT="${{ secrets.DB_PORT }}" \
+              DB_USERNAME="${{ secrets.DB_USERNAME }}" DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              DB_DATABASE="${{ secrets.DB_DATABASE }}" \
+              node scripts/tempos-da-ia.mjs
+            echo "::endgroup::"
             echo "::group::Ultimas leituras de arte"
             arquivos=$(pm2 jlist 2>/dev/null | node -e '
               let bruto = "";

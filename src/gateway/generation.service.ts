@@ -312,6 +312,7 @@ export class GenerationService {
    * provedor ser chamado, e que os dois modos de geração fazem igual.
    */
   private async prepare(dto: GenerateDto) {
+    const comecou = Date.now();
     const spec = featureSpec(dto.feature);
     if (!spec) throw new BadRequestException(`operação "${dto.feature}" não é aceita pelo gateway`);
 
@@ -355,6 +356,14 @@ export class GenerationService {
     const model = resolved.record.model;
     const context = await this.buildContext(spec, dto, clientId);
     const messages = await this.composeMessages(spec, context.blocks, dto);
+
+    // O tempo de montar o pedido não entra em `duration_ms`, que conta só a
+    // chamada ao provedor. Sem esta linha, a diferença entre o que a tela
+    // espera e o que a auditoria registra não tinha onde ser lida.
+    this.logger.log(
+      `pedido montado [operacao=${dto.feature} correlacao=${dto.correlationId} `
+        + `ms=${Date.now() - comecou}]`,
+    );
 
     return { dto, spec, primary, model, messages, context, revision: resolved.record };
   }
@@ -439,6 +448,23 @@ export class GenerationService {
     let clientUnavailable = clientHeld;
     let systemUnavailable = systemHeld;
 
+    const question = String(dto.retrievalQuestion || '').trim();
+    const scopePath = String(dto.scopePath || '').trim();
+
+    // Vetorizar a pergunta não depende do dossiê, e era o que esperava por ele:
+    // a leitura do dossiê, a chamada ao modelo de embeddings e as duas buscas
+    // aconteciam em fila indiana, uma atrás da outra, antes de a primeira letra
+    // da resposta existir. Aqui a vetorização começa junto com a leitura.
+    //
+    // A condição usa as camadas que o pedido já declarou indisponíveis, e não
+    // as que a leitura do dossiê venha a declarar: só assim ela é conhecida
+    // antes. A diferença aparece quando a leitura do dossiê falha e o acervo
+    // geral também estava retido — aí o embedding foi calculado à toa, o que
+    // custa uma chamada num caminho que já é de exceção.
+    const vetorEmCurso = question && !(clientHeld && systemHeld)
+      ? this.embedQuestion(question)
+      : Promise.resolve(null);
+
     if (!clientHeld) {
       const dossier = await this.knowledgeNotesService
         .findClientNote(clientId, KnowledgeNoteKind.CLIENT_DOSSIER)
@@ -467,12 +493,9 @@ export class GenerationService {
     // consulta". A raiz presumida pela identidade do cliente é o que fazia
     // cliente com espaço, `&`, acento ou underscore receber acervo vazio: os
     // chunks dele estavam gravados sob outra grafia legítima.
-    const question = String(dto.retrievalQuestion || '').trim();
-    const scopePath = String(dto.scopePath || '').trim();
-
     if (question && !(clientUnavailable && systemUnavailable)) {
       const budget = this.retrievalBudget();
-      const embedding = await this.embedQuestion(question);
+      const embedding = await vetorEmCurso;
 
       if (!embedding) {
         clientUnavailable = true;
@@ -483,19 +506,24 @@ export class GenerationService {
           'nomic-embed-text',
         );
 
-        const client = clientUnavailable
-          ? { failed: false, chunks: null }
-          : await this.searchLayer(`acervo de ${clientId}`, {
-              kind: 'client',
-              clientId,
-              ...(scopePath ? { scopePath } : {}),
-              includeDescendants: dto.includeDescendants,
-              excludeScopePaths: dto.excludeScopePaths,
-            }, embedding, embeddingModel);
-
-        const system = systemUnavailable
-          ? { failed: false, chunks: null }
-          : await this.searchLayer('acervo geral do sistema', { kind: 'system' }, embedding, embeddingModel);
+        // As duas camadas usam o mesmo vetor e não dependem uma da outra: em
+        // fila, o acervo geral só começava a ser consultado depois de o do
+        // cliente terminar, e a pessoa esperava a soma de duas buscas para
+        // receber o resultado de uma mesclagem.
+        const [client, system] = await Promise.all([
+          clientUnavailable
+            ? Promise.resolve({ failed: false, chunks: null } as const)
+            : this.searchLayer(`acervo de ${clientId}`, {
+                kind: 'client',
+                clientId,
+                ...(scopePath ? { scopePath } : {}),
+                includeDescendants: dto.includeDescendants,
+                excludeScopePaths: dto.excludeScopePaths,
+              }, embedding, embeddingModel),
+          systemUnavailable
+            ? Promise.resolve({ failed: false, chunks: null } as const)
+            : this.searchLayer('acervo geral do sistema', { kind: 'system' }, embedding, embeddingModel),
+        ]);
 
         if (client.failed) clientUnavailable = true;
         if (system.failed) systemUnavailable = true;

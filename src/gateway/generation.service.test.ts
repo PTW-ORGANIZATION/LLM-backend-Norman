@@ -886,6 +886,59 @@ describe('GenerationService', () => {
       expect(outcome.systemKnowledgeAvailable).toBe(true);
     });
 
+    // O tempo de montar o pedido é tempo de tela em branco: acontece antes de
+    // o provedor receber a primeira palavra. As três esperas abaixo não
+    // dependem umas das outras, e enfileirá-las somava a latência de todas.
+    it('consulta as duas camadas do acervo ao mesmo tempo', async () => {
+      let emVoo = 0;
+      let maiorSimultaneo = 0;
+      const searchSimilar = vi.fn(async () => {
+        emVoo += 1;
+        maiorSimultaneo = Math.max(maiorSimultaneo, emVoo);
+        await new Promise((resolva) => setTimeout(resolva, 20));
+        emVoo -= 1;
+        return [];
+      });
+      const { service } = buildService({ chunks: { searchSimilar } as any });
+
+      await service.generate(comCliente());
+
+      expect(searchSimilar).toHaveBeenCalledTimes(2);
+      expect(maiorSimultaneo).toBe(2);
+    });
+
+    it('vetoriza a pergunta enquanto lê o dossiê, e não depois', async () => {
+      const ordem: string[] = [];
+      const findClientNote = vi.fn(async () => {
+        await new Promise((resolva) => setTimeout(resolva, 20));
+        ordem.push('dossiê lido');
+        return null;
+      });
+      const { service } = buildService({
+        notes: { findClientNote } as any,
+        embed: vi.fn(async () => {
+          ordem.push('pergunta vetorizada');
+          return embedding();
+        }),
+      });
+
+      await service.generate(comCliente());
+
+      expect(ordem).toEqual(['pergunta vetorizada', 'dossiê lido']);
+    });
+
+    it('não vetoriza pergunta nenhuma quando as duas camadas vieram retidas', async () => {
+      const { service, ollama } = buildService();
+
+      await service.generate({
+        ...comCliente(),
+        knowledgeUnavailable: true,
+        systemKnowledgeUnavailable: true,
+      } as GenerateDto);
+
+      expect(ollama.embed).not.toHaveBeenCalled();
+    });
+
     describe('tokens estruturados de marca', () => {
       const comTokens = (overrides: Record<string, unknown> = {}) => ({
         ...comCliente(),
