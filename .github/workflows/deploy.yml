@@ -62,7 +62,7 @@ jobs:
             GROK_API_KEY=${{ secrets.GROK_API_KEY }}
             GROK_MODEL=${{ secrets.GROK_MODEL }}
             GROK_ALLOWED_MODELS=${{ secrets.GROK_ALLOWED_MODELS }}
-            QUEUE_CONCURRENCY=${{ secrets.QUEUE_CONCURRENCY }}
+            QUEUE_CONCURRENCY=${{ vars.QUEUE_CONCURRENCY }}
             QUEUE_JOB_TIMEOUT_MS=${{ secrets.QUEUE_JOB_TIMEOUT_MS }}
             REDIS_DB=${{ vars.REDIS_DB }}
             INTERNAL_API_TOKEN=${{ secrets.INTERNAL_API_TOKEN }}
@@ -77,31 +77,34 @@ jobs:
             # sem ela o gateway assume 127.0.0.1 enquanto a ingestão fala com o
             # host configurado, e os dois passam a apontar para lugares
             # diferentes sem ninguém perceber.
-            # REDIS_DB saiu de secret para variável de ambiente. Ele não é
-            # sigiloso — é o número do banco do Redis — e, como secret de valor
-            # "0", fazia o GitHub apagar TODO zero de TODA linha de log: um
-            # arquivo de 376060 bytes saía como "376***6***", e até um HTTP 200
-            # saía como "***". Diagnóstico nenhum sobrevive a isso, e o próprio
-            # workflow já contornava escrevendo os resultados por extenso.
+            # Estas chaves saíram de secret para variável de ambiente. Nenhuma
+            # é sigilosa — o número do banco do Redis e quantos jobs a fila
+            # processa juntos — e, como secrets de valor curto, elas apagavam do
+            # log todo número igual ao delas. Com REDIS_DB="0", um arquivo de
+            # 376060 bytes saía como "376***6***" e até um HTTP 200 saía como
+            # "***"; o próprio workflow contornava escrevendo por extenso.
+            # Diagnóstico nenhum sobrevive a isso.
             #
             # A troca só é segura se o valor for o mesmo, e ninguém consegue ler
             # um secret de fora para conferir. Quem confere é o servidor, com o
             # arquivo que ele já está usando. Divergência não derruba o deploy
-            # nem muda o banco em uso: o valor antigo fica, e o erro aparece.
-            antigo=$(grep '^REDIS_DB=' .env 2>/dev/null | cut -d= -f2-)
-            novo=$(grep '^REDIS_DB=' .env.novo | cut -d= -f2-)
-            if [ -n "${antigo}" ] && [ "${antigo}" != "${novo}" ]; then
-              echo "::error::REDIS_DB mudaria de valor nesta troca; o servidor segue com o que ja usava, e a variavel de ambiente precisa ser corrigida"
-              sed -i "s|^REDIS_DB=.*|REDIS_DB=${antigo}|" .env.novo
-            elif [ -z "${antigo}" ]; then
-              echo "REDIS_DB: o servidor nao tinha valor anterior para comparar"
-            else
-              echo "REDIS_DB: a variavel de ambiente bate com o que o servidor ja usava"
-            fi
+            # nem muda o que está em uso: o valor antigo fica, e o erro aparece.
+            for chave in REDIS_DB QUEUE_CONCURRENCY; do
+              antigo=$(grep "^${chave}=" .env 2>/dev/null | cut -d= -f2-)
+              novo=$(grep "^${chave}=" .env.novo | cut -d= -f2-)
+              if [ -n "${antigo}" ] && [ "${antigo}" != "${novo}" ]; then
+                echo "::error::${chave} mudaria de valor nesta troca; o servidor segue com o que ja usava, e a variavel de ambiente precisa ser corrigida"
+                sed -i "s|^${chave}=.*|${chave}=${antigo}|" .env.novo
+              elif [ -z "${antigo}" ]; then
+                echo "${chave}: o servidor nao tinha valor anterior para comparar"
+              else
+                echo "${chave}: a variavel de ambiente bate com o que o servidor ja usava"
+              fi
+            done
 
             # Valida no arquivo NOVO e só então substitui o que está em uso:
             # secret faltando derruba o deploy sem encostar no .env do servidor.
-            for chave in DB_HOST DB_DATABASE REDIS_HOST REDIS_DB OLLAMA_HOST GROK_BASE_URL GROK_API_KEY GROK_MODEL GROK_ALLOWED_MODELS INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
+            for chave in DB_HOST DB_DATABASE REDIS_HOST REDIS_DB QUEUE_CONCURRENCY OLLAMA_HOST GROK_BASE_URL GROK_API_KEY GROK_MODEL GROK_ALLOWED_MODELS INTERNAL_API_TOKEN NORMAN_INTERNAL_URL; do
               grep -qE "^${chave}=.+" .env.novo || { echo "::error::${chave} vazia — configure o secret no ambiente"; rm -f .env.novo; exit 1; }
             done
             mv .env.novo .env
