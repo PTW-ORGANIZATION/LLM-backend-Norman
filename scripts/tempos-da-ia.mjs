@@ -104,6 +104,58 @@ try {
     }
   }
 
+  // Mediana por dia. A mediana de catorze dias não enxerga uma mudança de
+  // ontem: ela fica presa às dezenas de chamadas de antes, e a melhora aparece
+  // como um arredondamento. Separada por dia, ela aparece inteira.
+  const { rows: porDia } = await cliente.query(
+    `SELECT feature,
+            created_at::date                                           AS dia,
+            COUNT(*)::int                                              AS chamadas,
+            percentile_disc(0.5) WITHIN GROUP (ORDER BY duration_ms)   AS mediana,
+            AVG(completion_tokens)                                     AS saida
+       FROM generation_executions
+      WHERE created_at > now() - interval '7 days'
+        AND status = 'succeeded'
+      GROUP BY feature, created_at::date
+      ORDER BY feature, dia`,
+  );
+
+  if (porDia.length > 0) {
+    console.log('');
+    console.log('mediana por dia, para ver mudanca recente separada do acumulado:');
+    console.log('operacao                       dia          n   mediana  saida');
+    for (const linha of porDia) {
+      console.log(
+        [
+          String(linha.feature).padEnd(30),
+          new Date(linha.dia).toISOString().slice(0, 10),
+          String(linha.chamadas).padStart(3),
+          segundos(linha.mediana).padStart(8),
+          inteiro(linha.saida).padStart(6),
+        ].join(' '),
+      );
+    }
+  }
+
+  const { rows: ultimas } = await cliente.query(
+    `SELECT feature, status, duration_ms, completion_tokens, created_at
+       FROM generation_executions
+      ORDER BY created_at DESC
+      LIMIT 12`,
+  );
+
+  if (ultimas.length > 0) {
+    console.log('');
+    console.log('as ultimas doze chamadas, uma a uma:');
+    for (const linha of ultimas) {
+      console.log(
+        `  ${new Date(linha.created_at).toISOString().slice(0, 16).replace('T', ' ')} `
+          + `${String(linha.feature).padEnd(26)} ${String(linha.status).padEnd(10)} `
+          + `${segundos(linha.duration_ms).padStart(7)} ${inteiro(linha.completion_tokens).padStart(5)} tokens`,
+      );
+    }
+  }
+
   const { rows: falhas } = await cliente.query(
     `SELECT feature, failure_kind, COUNT(*)::int AS total
        FROM generation_executions
