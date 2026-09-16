@@ -294,6 +294,15 @@ jobs:
               '
             fi
             echo "::endgroup::"
+            # O catalogo oferece a mesma familia sem raciocinio. Trocar so vale
+            # se ela continuar achando os erros, entao as duas correm sobre a
+            # arte de controle, com os tres erros plantados e o prompt real.
+            echo "::group::O modelo de hoje contra o que nao raciocina"
+            GROK_BASE_URL="${{ secrets.GROK_BASE_URL }}" \
+              GROK_API_KEY="${{ secrets.GROK_API_KEY }}" \
+              GROK_MODEL="${{ secrets.GROK_MODEL }}" \
+              node scripts/comparar-modelos-da-revisao.mjs
+            echo "::endgroup::"
             echo "::group::Estudos parados"
             DB_HOST="${{ secrets.DB_HOST }}" DB_PORT="${{ secrets.DB_PORT }}" \
               DB_USERNAME="${{ secrets.DB_USERNAME }}" DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
