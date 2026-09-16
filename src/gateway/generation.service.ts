@@ -655,9 +655,9 @@ export class GenerationService {
       this.logger.log(
         `imagem reduzida para a operação [operacao=${spec.feature} `
           + `de=${dataUrl.length - separador - 1} para=${arte.imagem.length} `
-          + `tamanho=${arte.largura}x${arte.altura}]`,
+          + `tamanho=${arte.largura}x${arte.altura} formato=${arte.mime}]`,
       );
-      return `data:image/png;base64,${arte.imagem.toString('base64')}`;
+      return `data:${arte.mime};base64,${arte.imagem.toString('base64')}`;
     }));
   }
 

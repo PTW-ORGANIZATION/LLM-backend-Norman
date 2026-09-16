@@ -51,6 +51,46 @@ describe('reduzirArteParaLeitura', () => {
     expect(arte.largura).toBe(600);
   });
 
+  // Cada arte sobe duas vezes ao provedor, na primeira passagem e na
+  // conferência. Numa peça fotográfica o PNG pesa cinco vezes e meia o JPEG, e
+  // o que ele preserva sem perdas é o ruído de uma foto que já era JPEG antes.
+  it('manda a peça fotográfica em JPEG, que é onde ela fica menor', async () => {
+    const foto = createCanvas(2000, 1600);
+    const ctx = foto.getContext('2d');
+    for (let x = 0; x < 2000; x += 2) {
+      for (let y = 0; y < 1600; y += 2) {
+        ctx.fillStyle = `rgb(${(x * 7) % 256},${(y * 13) % 256},${(x * y) % 256})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+
+    const arte = await reduzirArteParaLeitura(foto.toBuffer('image/jpeg', 90));
+
+    expect(arte.mime).toBe('image/jpeg');
+    expect(await loadImage(arte.imagem)).toBeTruthy();
+  });
+
+  it('mantém em PNG a peça chapada, onde o PNG já é o menor', async () => {
+    const chapada = createCanvas(2000, 1600);
+    const ctx = chapada.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 2000, 1600);
+    ctx.fillStyle = '#101010';
+    ctx.font = '160px sans-serif';
+    ctx.fillText('VENHA SELEBRAR', 60, 800);
+
+    const arte = await reduzirArteParaLeitura(chapada.toBuffer('image/png'));
+
+    expect(arte.mime).toBe('image/png');
+  });
+
+  it('não declara formato para a arte que segue como veio', async () => {
+    const arte = await reduzirArteParaLeitura(arteDe(900, 1100));
+
+    expect(arte.reduzida).toBe(false);
+    expect(arte.mime).toBe('');
+  });
+
   it('devolve o que recebeu quando não consegue decodificar a imagem', async () => {
     const nadaDeImagem = Buffer.from('isto não é uma imagem');
 

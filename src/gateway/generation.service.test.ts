@@ -1577,6 +1577,25 @@ describe('GenerationService', () => {
       expect(Math.max(decodificada.width, decodificada.height)).toBe(MAIOR_LADO_PARA_LEITURA);
     });
 
+    // A URL de dados precisa declarar o que ela de fato carrega: o provedor lê
+    // o tipo dali, e anunciar PNG para bytes JPEG é entregar uma imagem que ele
+    // recusa a decodificar.
+    it('anuncia na URL de dados o formato em que a arte foi codificada', async () => {
+      const { service, generate } = buildService();
+
+      await service.generate(pedidoGenerico({
+        feature: 'proof_review_visual',
+        messages: [{ role: 'user', content: 'revise', images: [arteDe(2000, 1600)] }],
+      } as Partial<GenerateDto>));
+
+      const enviada: string = generate.mock.calls[0][1].messages.at(-1).images[0];
+      const anunciado = enviada.slice('data:'.length, enviada.indexOf(';'));
+      const bytes = Buffer.from(enviada.slice(enviada.indexOf(',') + 1), 'base64');
+      const ehPng = bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+
+      expect(anunciado).toBe(ehPng ? 'image/png' : 'image/jpeg');
+    });
+
     it('deixa passar a arte que já cabe no teto', async () => {
       const { service, generate } = buildService();
       const original = arteDe(900, 700);
