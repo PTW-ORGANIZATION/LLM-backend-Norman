@@ -752,6 +752,17 @@ export class GenerationService {
           fallbackOf,
         };
         attempts.push(report);
+        // Quarenta segundos para devolver cinquenta tokens não é o modelo
+        // escrevendo: ou é a imagem subindo, ou é raciocínio que o provedor
+        // cobra em tempo e não conta em `completion_tokens`. São consertos
+        // opostos — encolher o que sobe, ou pedir menos raciocínio — e sem
+        // esta linha os dois eram palpite.
+        this.logger.log(
+          `resposta recebida [operacao=${dto.feature} correlacao=${dto.correlationId} `
+            + `total=${report.durationMs}ms entrada=${response.promptTokens ?? '-'} `
+            + `saida=${response.completionTokens ?? '-'} `
+            + `raciocinio=${response.reasoningTokens ?? '-'}]`,
+        );
         await this.record(dto, report, context, response.promptTokens, response.completionTokens, currentRevision);
 
         return {

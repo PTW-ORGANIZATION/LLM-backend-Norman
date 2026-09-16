@@ -40,6 +40,15 @@ export interface ProviderResponse {
   text: string;
   promptTokens: number | null;
   completionTokens: number | null;
+  /**
+   * Os tokens que o modelo gastou raciocinando antes de responder.
+   *
+   * Vem separado porque nem sempre entra em `completionTokens`, e enquanto não
+   * vinha era um tempo sem dono: uma revisão de arte que devolveu cinquenta
+   * tokens em quarenta segundos ou esperou pela rede, ou pensou caro e não
+   * contou. Nulo quando o provedor não informa.
+   */
+  reasoningTokens?: number | null;
 }
 
 /**

@@ -11,7 +11,11 @@ import {
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string | null } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    completion_tokens_details?: { reasoning_tokens?: number };
+  };
 }
 
 interface ChatCompletionChunk {
@@ -151,6 +155,11 @@ export class OpenAiChatAdapter implements LlmProvider {
           : null,
         completionTokens: Number.isFinite(payload?.usage?.completion_tokens as number)
           ? (payload!.usage!.completion_tokens as number)
+          : null,
+        reasoningTokens: Number.isFinite(
+          payload?.usage?.completion_tokens_details?.reasoning_tokens as number,
+        )
+          ? (payload!.usage!.completion_tokens_details!.reasoning_tokens as number)
           : null,
       };
     } catch (error) {

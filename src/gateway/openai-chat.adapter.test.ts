@@ -59,7 +59,7 @@ describe('OpenAiChatAdapter', () => {
     const adapter = new OpenAiChatAdapter(fetchImpl as unknown as typeof fetch);
 
     await expect(adapter.generate(CONEXAO, { ...PEDIDO, temperature: 0.3, maxTokens: 100, json: true }))
-      .resolves.toEqual({ text: 'resposta', promptTokens: 12, completionTokens: 3 });
+      .resolves.toEqual({ text: 'resposta', promptTokens: 12, completionTokens: 3, reasoningTokens: null });
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://api.openai.com/v1/chat/completions');
@@ -71,6 +71,23 @@ describe('OpenAiChatAdapter', () => {
       max_tokens: 100,
       response_format: { type: 'json_object' },
     });
+  });
+
+  // Tempo sem dono: uma resposta de cinquenta tokens em quarenta segundos ou
+  // esperou pela rede, ou pensou caro. O provedor conta o raciocínio à parte de
+  // `completion_tokens`, e sem lê-lo os dois casos chegam idênticos.
+  it('devolve os tokens de raciocínio quando o provedor os informa', async () => {
+    const comRaciocinio = () => new Response(JSON.stringify({
+      choices: [{ message: { content: 'resposta' } }],
+      usage: {
+        prompt_tokens: 12,
+        completion_tokens: 3,
+        completion_tokens_details: { reasoning_tokens: 980 },
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const adapter = new OpenAiChatAdapter(vi.fn(async () => comRaciocinio()) as unknown as typeof fetch);
+
+    await expect(adapter.generate(CONEXAO, PEDIDO)).resolves.toMatchObject({ reasoningTokens: 980 });
   });
 
   it('conexão sem credencial não manda header de autorização', async () => {
