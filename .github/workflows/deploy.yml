@@ -144,9 +144,25 @@ jobs:
             echo "::group::Chaves do .env que ficaram vazias"
             vazias=$(grep -E '^[A-Z_]+=$' .env | cut -d= -f1 | tr '\n' ' ')
             if [ -n "${vazias}" ]; then
-              echo "::warning::chaves vazias no .env do servidor: ${vazias}"
+              echo "chaves vazias no .env do servidor: ${vazias}"
             else
               echo "nenhuma chave do .env ficou vazia"
+            fi
+            # Vazia nao e sinonimo de quebrada: OLLAMA_OPENAI_BASE_URL e
+            # OLLAMA_ALLOWED_MODELS tem padrao no codigo, e vazias significam
+            # "o ollama local, com o modelo configurado". O que importa e outra
+            # coisa, e e o que esta checagem responde: o gateway e a ingestao
+            # falam com o MESMO ollama? Sao duas variaveis diferentes para o
+            # mesmo servico, e divergir nao da erro em lugar nenhum -- os dois
+            # passam a olhar maquinas diferentes em silencio.
+            # Em palavras, nunca imprimindo o endereco: ele e secret.
+            host=$(grep '^OLLAMA_HOST=' .env | cut -d= -f2-)
+            base=$(grep '^OLLAMA_OPENAI_BASE_URL=' .env | cut -d= -f2-)
+            if [ -z "${base}" ]; then base="http://127.0.0.1:11434/v1"; fi
+            if [ "${base}" = "${host%/}/v1" ]; then
+              echo "ollama: o gateway e a ingestao apontam para o mesmo servico"
+            else
+              echo "::warning::ollama: o gateway e a ingestao apontam para servicos diferentes; confira OLLAMA_OPENAI_BASE_URL contra OLLAMA_HOST"
             fi
             echo "::endgroup::"
             echo "::group::Processos e portas"
