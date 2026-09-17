@@ -24,7 +24,7 @@ const SYSTEM_ROOT = '_Conhecimento geral do sistema';
 const AMBIENTE = {
   OLLAMA_MODEL: 'llama-local',
   OLLAMA_ALLOWED_MODELS: 'llama-local',
-  OPENAI_ALLOWED_MODELS: '',
+  GROK_ALLOWED_MODELS: '',
 };
 
 function embedding() {

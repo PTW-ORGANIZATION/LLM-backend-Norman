@@ -6,7 +6,7 @@ import { resolveConnection } from './provider-connection';
 const AMBIENTE = {
   OLLAMA_MODEL: 'llama-local',
   OLLAMA_ALLOWED_MODELS: 'llama-local,llama-grande',
-  OPENAI_ALLOWED_MODELS: '',
+  GROK_ALLOWED_MODELS: '',
   GROK_API_KEY: '',
 };
 

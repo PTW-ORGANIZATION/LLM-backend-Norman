@@ -100,7 +100,7 @@ describe('HealthController — camadas', () => {
     expect(resultado.gateway.connections).toEqual(
       expect.arrayContaining([
         { key: 'ollama', provisioned: true },
-        { key: 'openai', provisioned: false },
+        { key: 'grok', provisioned: false },
         { key: 'grok', provisioned: false },
       ]),
     );

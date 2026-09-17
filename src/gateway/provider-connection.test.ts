@@ -49,12 +49,12 @@ describe('resolveConnection', () => {
   });
 
   it('OpenAI sem chave aparece como indisponível, e não como pronta', () => {
-    expect(resolveConnection('openai', {})).toEqual({
-      key: 'openai',
-      label: 'OpenAI',
+    expect(resolveConnection('grok', {})).toEqual({
+      key: 'grok',
+      label: 'Grok (xAI)',
       protocol: 'openai_chat',
       available: false,
-      reason: 'defina OPENAI_API_KEY',
+      reason: 'defina GROK_API_KEY',
     });
   });
 
@@ -69,13 +69,13 @@ describe('resolveConnection', () => {
   });
 
   it('URL base inválida não cai para o padrão de outro provedor', () => {
-    expect(resolveConnection('openai', {
-      OPENAI_API_KEY: 'k',
-      OPENAI_MODEL: 'gpt-x',
-      OPENAI_BASE_URL: 'ftp://host',
+    expect(resolveConnection('grok', {
+      GROK_API_KEY: 'k',
+      GROK_MODEL: 'gpt-x',
+      GROK_BASE_URL: 'ftp://host',
     })).toMatchObject({
       available: false,
-      reason: 'OPENAI_BASE_URL: protocolo não suportado na URL base: ftp:',
+      reason: 'GROK_BASE_URL: protocolo não suportado na URL base: ftp:',
     });
   });
 
@@ -88,10 +88,10 @@ describe('resolveConnection', () => {
   });
 
   it('a lista de modelos permitidos sai do ambiente e sempre inclui o padrão', () => {
-    expect(resolveConnection('openai', {
-      OPENAI_API_KEY: 'k',
-      OPENAI_MODEL: 'modelo-padrao',
-      OPENAI_ALLOWED_MODELS: 'modelo-a, modelo-b',
+    expect(resolveConnection('grok', {
+      GROK_API_KEY: 'k',
+      GROK_MODEL: 'modelo-padrao',
+      GROK_ALLOWED_MODELS: 'modelo-a, modelo-b',
     })).toMatchObject({
       available: true,
       allowedModels: ['modelo-padrao', 'modelo-a', 'modelo-b'],
@@ -99,33 +99,40 @@ describe('resolveConnection', () => {
   });
 
   it('sem lista configurada, só o modelo padrão é permitido', () => {
-    expect(resolveConnection('openai', { OPENAI_API_KEY: 'k', OPENAI_MODEL: 'gpt-x' }))
+    expect(resolveConnection('grok', { GROK_API_KEY: 'k', GROK_MODEL: 'gpt-x' }))
       .toMatchObject({ allowedModels: ['gpt-x'] });
   });
 
   it('a lista que já contém o padrão não o duplica', () => {
-    expect(resolveConnection('openai', {
-      OPENAI_API_KEY: 'k',
-      OPENAI_MODEL: 'gpt-x',
-      OPENAI_ALLOWED_MODELS: 'gpt-x,gpt-y',
+    expect(resolveConnection('grok', {
+      GROK_API_KEY: 'k',
+      GROK_MODEL: 'gpt-x',
+      GROK_ALLOWED_MODELS: 'gpt-x,gpt-y',
     })).toMatchObject({ allowedModels: ['gpt-x', 'gpt-y'] });
   });
 
+  // Chave de um provedor enviada ao endpoint de outro é vazamento de
+  // credencial, e a forma de errar isso é ler a variável errada do ambiente.
   it('a chave de um provedor não atravessa para outro', () => {
-    const grok = resolveConnection('grok', {
-      OPENAI_API_KEY: 'chave-da-openai',
+    const ambiente = {
+      OLLAMA_API_KEY: 'chave-do-ollama',
+      OLLAMA_MODEL: 'llama-local',
       GROK_API_KEY: 'chave-do-grok',
       GROK_MODEL: 'grok-x',
-    });
+    };
+
+    const grok = resolveConnection('grok', ambiente);
+    const ollama = resolveConnection('ollama', ambiente);
 
     expect(grok).toMatchObject({ available: true, baseUrl: 'https://api.x.ai/v1' });
     expect((grok as { apiKey?: string }).apiKey).toBe('chave-do-grok');
+    expect((ollama as { apiKey?: string }).apiKey).toBe('chave-do-ollama');
   });
 
   it('a listagem cobre todas as conexões provisionadas, disponíveis ou não', () => {
     const chaves = listConnections({}).map((connection) => connection.key);
 
-    expect(chaves).toEqual(['ollama', 'openai', 'grok']);
+    expect(chaves).toEqual(['ollama', 'grok']);
     expect(listConnections({}).filter((connection) => connection.available)).toHaveLength(1);
   });
 });

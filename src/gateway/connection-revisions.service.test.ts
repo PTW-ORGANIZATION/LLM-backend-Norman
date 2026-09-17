@@ -88,16 +88,12 @@ describe('registro de revisões de conexão', () => {
       .rejects.toThrow(/não está entre os permitidos/);
   });
 
+  // A chave é de uma conexão que o registro não conhece. Revisão só nasce
+  // sobre provisionamento que existe deste lado: reconhecer uma revisão de
+  // conexão inventada seria aprovar um destino que ninguém sabe qual é.
   it('conexão sem provisionamento neste backend não vira revisão', async () => {
-    const anterior = process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
-    try {
-      await expect(service.sync({ connectionKey: 'openai', revision: 1, model: 'gpt' }))
-        .rejects.toThrow(/defina OPENAI_API_KEY/);
-    } finally {
-      if (anterior === undefined) delete process.env.OPENAI_API_KEY;
-      else process.env.OPENAI_API_KEY = anterior;
-    }
+    await expect(service.sync({ connectionKey: 'openai', revision: 1, model: 'gpt' }))
+      .rejects.toThrow(/não está provisionada neste backend/);
   });
 
   it('nada do segredo nem da URL sai no registro', async () => {

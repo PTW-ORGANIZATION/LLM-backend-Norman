@@ -75,18 +75,18 @@ describe('InternalGenerationController.capabilities', () => {
   });
 
   it('conexão sem configuração aparece indisponível com a variável que falta', async () => {
-    const original = process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
+    const original = process.env.GROK_API_KEY;
+    delete process.env.GROK_API_KEY;
     try {
       const { controller } = buildController();
 
-      const openai = (await controller.capabilities()).connections.find((c) => c.key === 'openai');
+      const semChave = (await controller.capabilities()).connections.find((c) => c.key === 'grok');
 
-      expect(openai).toMatchObject({ available: false, reason: 'defina OPENAI_API_KEY' });
-      expect(openai).not.toHaveProperty('defaultModel');
+      expect(semChave).toMatchObject({ available: false, reason: 'defina GROK_API_KEY' });
+      expect(semChave).not.toHaveProperty('defaultModel');
     } finally {
-      if (original === undefined) delete process.env.OPENAI_API_KEY;
-      else process.env.OPENAI_API_KEY = original;
+      if (original === undefined) delete process.env.GROK_API_KEY;
+      else process.env.GROK_API_KEY = original;
     }
   });
 

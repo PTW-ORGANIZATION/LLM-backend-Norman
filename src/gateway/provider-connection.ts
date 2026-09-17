@@ -16,6 +16,12 @@ export interface ProviderSpec {
 /**
  * As conexões que este backend sabe resolver, por chave.
  *
+ * São duas: o Ollama, que roda na própria máquina, e o Grok. A OpenAI saiu —
+ * não há conta dela, e uma conexão provisionável que ninguém pode usar é uma
+ * escolha a mais na tela que só rende erro na hora de ativar. O protocolo
+ * `openai_chat` continua: é o formato de fio que as duas falam, e não a
+ * empresa.
+ *
  * A lista é a allowlist: o contrato interno manda uma chave, nunca uma URL nem
  * um segredo, e o que não está aqui não existe. Cada conexão lê a própria
  * variável de ambiente, e nada atravessa de uma para outra — chave de um
@@ -37,18 +43,6 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
     defaultBaseUrl: 'http://127.0.0.1:11434/v1',
     defaultModel: 'llama3.1:8b-instruct-q4_0',
     requiresApiKey: false,
-  },
-  openai: {
-    key: 'openai',
-    label: 'OpenAI',
-    protocol: 'openai_chat',
-    baseUrlEnv: 'OPENAI_BASE_URL',
-    apiKeyEnv: 'OPENAI_API_KEY',
-    modelEnv: 'OPENAI_MODEL',
-    allowedModelsEnv: 'OPENAI_ALLOWED_MODELS',
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    defaultModel: null,
-    requiresApiKey: true,
   },
   grok: {
     key: 'grok',

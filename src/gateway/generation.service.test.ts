@@ -28,7 +28,7 @@ const AMBIENTE = {
   OLLAMA_ALLOWED_MODELS: 'llama-local,llama-grande',
   GROK_API_KEY: 'chave-do-grok',
   GROK_MODEL: 'grok-x',
-  OPENAI_ALLOWED_MODELS: '',
+  GROK_ALLOWED_MODELS: '',
 };
 
 function embedding() {
@@ -267,7 +267,7 @@ describe('GenerationService', () => {
 
       await expect(service.generate(pedido({
         activation: { activationId: 'act-1', connectionKey: 'openai', connectionRevision: 1 },
-      }))).rejects.toThrow(/defina OPENAI_API_KEY/);
+      }))).rejects.toThrow(/não está provisionada neste backend/);
       expect(generate).not.toHaveBeenCalled();
     });
 
@@ -1206,7 +1206,7 @@ describe('GenerationService', () => {
       await expect(service.generate(pedido({
         fallback: {
           enabled: true,
-          connectionKey: 'openai',
+          connectionKey: 'grok',
           connectionRevision: 1,
           model: 'gpt-de-fora',
           allowedCauses: ['unavailable'],
