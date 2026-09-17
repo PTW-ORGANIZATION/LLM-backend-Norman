@@ -1,0 +1,10 @@
+# Um endereço com uma letra a menos entrou na configuração e assinou a maior
+# parte deste repositório: `abencio` no lugar de `abenicio`. Reescrever a
+# história para consertar isso seria force-push em branch compartilhada, e o
+# estrago é maior que o defeito.
+#
+# Aqui o git passa a contar as duas grafias como a mesma pessoa: `git log`,
+# `git shortlog`, `git blame` e as contagens de contribuição respondem pelo
+# endereço certo, sem um commit sequer mudar de hash.
+Diego Abenicio <diego.abenicio@ptwag.com> <diego.abencio@ptwag.com>
+Diego Abenicio <diego.abenicio@ptwag.com> <diego.abenicio1@gmail.com>
