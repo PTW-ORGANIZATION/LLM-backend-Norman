@@ -302,6 +302,9 @@ jobs:
               GROK_API_KEY="${{ secrets.GROK_API_KEY }}" \
               GROK_MODEL="${{ secrets.GROK_MODEL }}" \
               GROK_ALLOWED_MODELS="${{ secrets.GROK_ALLOWED_MODELS }}" \
+              OLLAMA_OPENAI_BASE_URL="${{ secrets.OLLAMA_OPENAI_BASE_URL }}" \
+              OLLAMA_MODEL="${{ secrets.OLLAMA_MODEL }}" \
+              OLLAMA_API_KEY="${{ secrets.OLLAMA_API_KEY }}" \
               node scripts/comparar-modelos-da-revisao.mjs
             echo "::endgroup::"
             echo "::group::Estudos parados"

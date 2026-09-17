@@ -128,6 +128,33 @@ try {
   console.log(`arte de controle com ${ERROS_PLANTADOS.length} erros plantados, prompt real da operacao:`);
   linha('modelo de hoje', await medir({ baseUrl, apiKey, modelo, spec, imagem }));
   linha('sem raciocinio', await medir({ baseUrl, apiKey, modelo: `${modelo}${SUFIXO}`, spec, imagem }));
+
+  // A pessoa troca a conexao ativa na tela de Conhecimento de IA, e a revisao
+  // de arte passa a rodar no que ela escolheu -- inclusive num modelo de texto,
+  // que nao enxerga. Ninguem verifica visao antes de mandar a imagem: o
+  // adaptador declara que o PROTOCOLO transporta imagem, e conta com o provedor
+  // recusar o que o modelo nao aguenta.
+  //
+  // Recusar seria o bom caso: o Norman cai na leitura em separado e a revisao
+  // acontece. O caso ruim e o modelo de texto ignorar a imagem e responder do
+  // mesmo jeito -- ai a tela recebe uma revisao inventada de uma arte que
+  // ninguem viu, com toda a cara de legitima. Esta linha diz qual dos dois e.
+  const baseLocal = (process.env.OLLAMA_OPENAI_BASE_URL || '').trim() || 'http://127.0.0.1:11434/v1';
+  const modeloLocal = (process.env.OLLAMA_MODEL || '').trim();
+  if (modeloLocal) {
+    console.log('');
+    console.log('e se alguem trocar a conexao ativa para um modelo de texto?');
+    const cego = await medir({
+      baseUrl: baseLocal, apiKey: (process.env.OLLAMA_API_KEY || '').trim() || 'sem-chave',
+      modelo: modeloLocal, spec, imagem,
+    });
+    linha('modelo que nao ve', cego);
+    if (!cego.recusa) {
+      console.log(cego.achados.length > 0
+        ? '  ::AVISO:: ele respondeu sobre uma arte que nao enxergou, e acertou por acaso ou por chute'
+        : '  ele respondeu sem enxergar. Achado nenhum aqui nao prova que ele se cala: veja se `texts` veio vazio');
+    }
+  }
 } catch (erro) {
   console.log(`a comparacao nao terminou: ${erro?.message ?? erro}`);
 }
