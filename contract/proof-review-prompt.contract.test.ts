@@ -7,6 +7,10 @@ import {
 } from '../src/gateway/feature-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_EXECUTOR, featureSpec } from '../src/gateway/feature-registry';
 import { REGRAS_DA_REVISAO_DE_ARTE as REGRAS_DO_NORMAN } from '@norman/lib/proof-review-rules';
+import {
+  REVISAO_DE_ARTE as REVISAO_DO_NORMAN,
+  REVISAO_DE_ARTE_PELA_IMAGEM as REVISAO_PELA_IMAGEM_DO_NORMAN,
+} from '@norman/modules/ai/revisor-de-arte.prompts';
 import { GATEWAY_FEATURES } from '@norman/modules/ai/llm-gateway.client';
 import {
   CONDUCAO_DO_BRIEFING as CONDUCAO_DO_NORMAN,
@@ -29,6 +33,28 @@ import {
  * A comparação é literal e nos dois sentidos. Regra acrescentada de um lado só
  * reprova aqui, que é o único lugar onde os dois textos se encontram.
  */
+/**
+ * Os prompts inteiros da revisão de arte, comparados entre os dois serviços.
+ *
+ * A revisão saiu do gateway e passou a acontecer dentro do Norman, mas as
+ * operações do executor continuam de pé como caminho de volta. Duas cópias do
+ * mesmo prompt, e só uma em uso: melhorar a que roda e deixar a outra
+ * envelhecer é o defeito silencioso que espera quem um dia voltar — ele não
+ * volta para o comportamento de hoje, volta para o de meses atrás.
+ *
+ * Enquanto as duas existirem, elas são iguais ou esta suíte reprova. No dia em
+ * que a operação do executor for aposentada de verdade, este teste sai junto.
+ */
+describe('os prompts da revisão de arte nos dois serviços', () => {
+  it('a revisão de lista de textos é a mesma dos dois lados', () => {
+    expect(featureSpec('proof_review')!.systemPrompt).toBe(REVISAO_DO_NORMAN);
+  });
+
+  it('a revisão que olha a peça é a mesma dos dois lados', () => {
+    expect(featureSpec('proof_review_visual')!.systemPrompt).toBe(REVISAO_PELA_IMAGEM_DO_NORMAN);
+  });
+});
+
 describe('as regras da revisão de arte nos dois serviços', () => {
   it('são as mesmas, frase a frase e na mesma ordem', () => {
     expect(REGRAS_DO_EXECUTOR).toEqual(REGRAS_DO_NORMAN);
