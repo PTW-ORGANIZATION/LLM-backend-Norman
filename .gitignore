@@ -2,3 +2,11 @@ node_modules/
 dist/
 .env
 *.log
+
+# Documentos de planejamento e auditoria ficam locais, como sempre ficaram.
+AJUSTE*_*.md
+CORRECAO*_*.md
+CORRECOES_*.md
+HANDOFF_*.md
+PLANO_*.md
+TESTE_*.md
