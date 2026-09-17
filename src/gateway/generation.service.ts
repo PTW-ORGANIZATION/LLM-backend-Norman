@@ -304,7 +304,12 @@ export class GenerationService {
 
         fallbackOf = connection.key;
         connection = alternative.connection;
-        currentModel = alternative.model;
+        // A escolha da variante vale para a conexão que de fato executar. Sem
+        // isto, a operação que dispensa raciocínio o dispensava só no primário:
+        // o fallback voltava calado ao modelo que pensa cinco mil tokens para
+        // achar um erro de ortografia, e a mesma revisão levava um minuto em
+        // vez de dois segundos, sem nada na tela dizendo por quê.
+        currentModel = this.modeloDaOperacao(prepared.spec, alternative.connection, alternative.model);
         currentRevision = alternative.revision;
       }
     }
@@ -840,7 +845,12 @@ export class GenerationService {
 
         fallbackOf = connection.key;
         connection = alternative.connection;
-        currentModel = alternative.model;
+        // A escolha da variante vale para a conexão que de fato executar. Sem
+        // isto, a operação que dispensa raciocínio o dispensava só no primário:
+        // o fallback voltava calado ao modelo que pensa cinco mil tokens para
+        // achar um erro de ortografia, e a mesma revisão levava um minuto em
+        // vez de dois segundos, sem nada na tela dizendo por quê.
+        currentModel = this.modeloDaOperacao(spec, alternative.connection, alternative.model);
         currentRevision = alternative.revision;
       }
     }

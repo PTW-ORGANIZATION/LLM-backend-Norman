@@ -1141,6 +1141,45 @@ describe('GenerationService', () => {
       });
     });
 
+    // A operação que dispensa raciocínio o dispensava só no primário: o
+    // fallback voltava calado ao modelo que pensa cinco mil tokens para achar um
+    // erro de ortografia, e a mesma revisão levava um minuto em vez de dois
+    // segundos, sem nada na tela dizendo por quê.
+    it('a operação que dispensa raciocínio também o dispensa no fallback', async () => {
+      const anterior = process.env.GROK_ALLOWED_MODELS;
+      process.env.GROK_ALLOWED_MODELS = 'grok-x,grok-x-0309-non-reasoning';
+      await dataSource.query(`DELETE FROM connection_activations`);
+      await dataSource.query(`DELETE FROM connection_revisions`);
+      await seedRevisions();
+
+      try {
+        const generate = vi.fn()
+          .mockImplementationOnce(async () => { throw new ProviderFailure('unavailable', 'caiu'); })
+          .mockImplementationOnce(async () => ({ text: '{}', promptTokens: null, completionTokens: null }));
+        const { service } = buildService({ provider: { generate } as any });
+
+        const outcome = await service.generate(pedidoGenerico({
+          feature: 'proof_review_visual',
+          messages: [{ role: 'user', content: 'revise' }],
+          fallback: {
+            enabled: true,
+            connectionKey: 'grok',
+            connectionRevision: 1,
+            model: 'grok-x',
+            allowedCauses: ['unavailable'],
+            maxAttempts: 2,
+          },
+        } as Partial<GenerateDto>));
+
+        expect(outcome.usedConnectionKey).toBe('grok');
+        expect(outcome.usedModel).toBe('grok-x-0309-non-reasoning');
+        expect(generate.mock.calls[1][1].model).toBe('grok-x-0309-non-reasoning');
+      } finally {
+        if (anterior === undefined) delete process.env.GROK_ALLOWED_MODELS;
+        else process.env.GROK_ALLOWED_MODELS = anterior;
+      }
+    });
+
     it('erro de autorização não troca de provedor, mesmo com fallback ligado', async () => {
       const generate = falha('authorization');
       const { service } = buildService({ provider: { generate } as any });

@@ -370,6 +370,9 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
     json: true,
     defaults: { temperature: 0.05, maxTokens: 4096 },
     systemPrompt: REVISAO_DE_ARTE,
+    // Pelo mesmo motivo da irmã que olha a peça: conferir a grafia de uma lista
+    // de palavras não é trabalho que peça raciocínio caro.
+    dispensaRaciocinio: true,
   }),
   proof_review_visual: spec('proof_review_visual', {
     clientBinding: 'none',
