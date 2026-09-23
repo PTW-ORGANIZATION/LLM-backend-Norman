@@ -75,7 +75,9 @@ describe('paridade dos prompts do gateway', () => {
     expect(briefing).toContain(
       '{"objective":"...","context":"...","target":"...","message":"...","visual":"...","channels":"..."}',
     );
-    expect(briefing).toContain('Preencha TODOS os 6 campos');
+    expect(briefing).not.toContain('Preencha TODOS os 6 campos');
+    expect(briefing).toContain('recebe exatamente "a definir"');
+    expect(briefing).toContain('nunca define objetivo, contexto, publico ou mensagem do projeto');
   });
 
   it('o briefing de documento usa o mesmo contrato do briefing final', () => {

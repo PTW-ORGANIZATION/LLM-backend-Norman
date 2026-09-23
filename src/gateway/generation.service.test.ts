@@ -1557,8 +1557,9 @@ describe('GenerationService', () => {
         .filter((m: any) => m.role === 'system')
         .map((m: any) => m.content)
         .join('\n');
-      expect(sistema).toContain('Nao faca mais perguntas nesta resposta.');
+      expect(sistema).toContain('nao faca mais perguntas nesta resposta.');
       expect(sistema).toContain('a definir');
+      expect(sistema).toContain('ainda nao sao suficientes');
     });
 
     it('não acrescenta nada quando a conversa segue normal', async () => {
@@ -1570,7 +1571,7 @@ describe('GenerationService', () => {
         .filter((m: any) => m.role === 'system')
         .map((m: any) => m.content)
         .join('\n');
-      expect(sistema).not.toContain('Nao faca mais perguntas nesta resposta.');
+      expect(sistema).not.toContain('nao faca mais perguntas nesta resposta.');
     });
 
     it('não vale para operação que não é conversa', async () => {
@@ -1586,7 +1587,7 @@ describe('GenerationService', () => {
         .filter((m: any) => m.role === 'system')
         .map((m: any) => m.content)
         .join('\n');
-      expect(sistema).not.toContain('Nao faca mais perguntas nesta resposta.');
+      expect(sistema).not.toContain('nao faca mais perguntas nesta resposta.');
     });
   });
 
