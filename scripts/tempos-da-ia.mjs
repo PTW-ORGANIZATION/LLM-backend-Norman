@@ -29,6 +29,17 @@ function segundos(ms) {
   return `${(Number(ms) / 1000).toFixed(1)}s`;
 }
 
+/**
+ * O nome do modelo com as letras separadas.
+ *
+ * `GROK_MODEL` e `OLLAMA_MODEL` são secrets do ambiente, e o GitHub apaga do
+ * log todo trecho igual a um secret: o modelo saía como `***`, que é
+ * justamente o que se quer ler aqui. Nome de modelo não é sigilo.
+ */
+function modeloLegivel(modelo) {
+  return String(modelo || '-').split('').join(' ');
+}
+
 function inteiro(valor) {
   if (valor === null || valor === undefined) return '-';
   return String(Math.round(Number(valor)));
@@ -138,7 +149,8 @@ try {
   }
 
   const { rows: ultimas } = await cliente.query(
-    `SELECT feature, status, duration_ms, completion_tokens, created_at
+    `SELECT feature, status, duration_ms, completion_tokens, created_at,
+            connection_key, connection_revision, model
        FROM generation_executions
       ORDER BY created_at DESC
       LIMIT 12`,
@@ -151,7 +163,8 @@ try {
       console.log(
         `  ${new Date(linha.created_at).toISOString().slice(0, 16).replace('T', ' ')} `
           + `${String(linha.feature).padEnd(26)} ${String(linha.status).padEnd(10)} `
-          + `${segundos(linha.duration_ms).padStart(7)} ${inteiro(linha.completion_tokens).padStart(5)} tokens`,
+          + `${segundos(linha.duration_ms).padStart(7)} ${inteiro(linha.completion_tokens).padStart(5)} tokens `
+          + `${linha.connection_key} r${linha.connection_revision} ${modeloLegivel(linha.model)}`,
       );
     }
   }
