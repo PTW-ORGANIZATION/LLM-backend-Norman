@@ -354,6 +354,14 @@ jobs:
               fi
             fi
             echo "::endgroup::"
+            # O briefing de entregável que falha antes de chegar ao provedor não
+            # grava linha em generation_executions: o rastro dele só existe no log.
+            echo "::group::Briefing de entregavel e erros recentes"
+            if [ -n "${existentes:-}" ]; then
+              rastro=$(grep -ah "workflow_briefing\|ERROR\|Exception\|Error:" ${existentes} | grep -v "^\s*at " | tail -40)
+              if [ -n "${rastro}" ]; then echo "${rastro}"; else echo "nenhuma linha de briefing de entregavel nem de erro nos logs"; fi
+            fi
+            echo "::endgroup::"
             echo "::group::Ultimos avisos do executor"
             pm2 logs llm-backend --lines 300 --nostream 2>&1 \
               | grep -aiE "warn|error|falhou|recusou" | tail -30
