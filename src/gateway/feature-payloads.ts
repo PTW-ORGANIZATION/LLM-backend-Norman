@@ -43,6 +43,26 @@ export function normalizeWorkflowBriefing(
 }
 
 /**
+ * As regras do briefing de entregável, iguais às que o Norman manda no
+ * caminho legado; a suíte de contrato compara as duas listas.
+ *
+ * A regra de seguir existe porque "nao preciso dessas perguntas, vamos seguir
+ * em frente" voltava com as mesmas perguntas: nada permitia encerrar com
+ * pendências. Pendência vira "a definir", que denuncia o buraco.
+ */
+export const REGRAS_DO_BRIEFING_DE_WORKFLOW: readonly string[] = [
+  "- Considere apenas as perguntas acima.",
+  "- Extraia respostas de tudo o que o usuario escreveu na conversa, inclusive em mensagens anteriores, quando elas estiverem claras.",
+  "- Cada resposta extraida e um resumo curto do trecho que responde a pergunta, e nao uma copia do texto inteiro do usuario.",
+  "- Preserve respostas ja preenchidas, a menos que o usuario complemente ou corrija explicitamente.",
+  "- Se o usuario pedir para seguir sem responder as perguntas pendentes (por exemplo \"nao preciso dessas perguntas\", \"pode seguir\", \"vamos em frente\"), preencha cada pergunta ainda sem resposta com exatamente \"a definir\", marque ready=true e devolva missingQuestions vazio.",
+  "- Fora esse caso, se faltarem respostas, liste de forma clara TODAS as perguntas ainda pendentes.",
+  "- Se todas as perguntas estiverem respondidas com clareza suficiente, marque ready=true.",
+  "- Nao invente informacoes ausentes.",
+  "- Responda em Portugues do Brasil.",
+] as const;
+
+/**
  * O prompt de sistema do briefing de entregável, com as perguntas e o estado.
  *
  * O texto é o do caminho legado, incluindo a ausência de acentuação e o formato
@@ -63,13 +83,7 @@ Estado atual das respostas:
 ${questions.map((question) => `- ${question}: ${answers[question] || '[sem resposta]'}`).join('\n')}
 
 Regras obrigatorias:
-- Considere apenas as perguntas acima.
-- Extraia respostas do texto do usuario quando elas estiverem claras e objetivas.
-- Preserve respostas ja preenchidas, a menos que o usuario complemente ou corrija explicitamente.
-- Se faltarem respostas, liste de forma clara TODAS as perguntas ainda pendentes.
-- Se todas as perguntas estiverem respondidas com clareza suficiente, marque ready=true.
-- Nao invente informacoes ausentes.
-- Responda em Portugues do Brasil.
+${REGRAS_DO_BRIEFING_DE_WORKFLOW.join('\n')}
 
 Retorne APENAS JSON valido neste formato:
 {

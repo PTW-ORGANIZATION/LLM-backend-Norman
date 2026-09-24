@@ -116,7 +116,7 @@ describe('paridade dos prompts do gateway', () => {
   it('a temperatura e o teto de saída são os praticados em cada operação', () => {
     expect(FEATURE_SPECS.chat.defaults).toEqual({ temperature: 0.7, maxTokens: 1024 });
     expect(FEATURE_SPECS.briefing_final.defaults).toEqual({ temperature: 0.7, maxTokens: 2048 });
-    expect(FEATURE_SPECS.workflow_briefing.defaults).toEqual({ temperature: 0.3, maxTokens: 1400 });
+    expect(FEATURE_SPECS.workflow_briefing.defaults).toEqual({ temperature: 0.3, maxTokens: 4096 });
     expect(FEATURE_SPECS.job_insights.defaults).toEqual({ temperature: 0.6, maxTokens: 4096 });
   });
 });

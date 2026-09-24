@@ -169,6 +169,28 @@ try {
     }
   }
 
+  const { rows: falhasRecentes } = await cliente.query(
+    `SELECT created_at, feature, failure_kind, failure_reason, duration_ms,
+            connection_key, connection_revision
+       FROM generation_executions
+      WHERE status <> 'succeeded'
+      ORDER BY created_at DESC
+      LIMIT 8`,
+  );
+
+  if (falhasRecentes.length > 0) {
+    console.log('');
+    console.log('as ultimas falhas, com o motivo gravado:');
+    for (const linha of falhasRecentes) {
+      console.log(
+        `  ${new Date(linha.created_at).toISOString().slice(0, 16).replace('T', ' ')} `
+          + `${String(linha.feature).padEnd(26)} ${String(linha.failure_kind).padEnd(16)} `
+          + `${segundos(linha.duration_ms).padStart(7)} ${linha.connection_key} r${linha.connection_revision} `
+          + `${String(linha.failure_reason || '-').slice(0, 200)}`,
+      );
+    }
+  }
+
   const { rows: falhas } = await cliente.query(
     `SELECT feature, failure_kind, COUNT(*)::int AS total
        FROM generation_executions

@@ -353,24 +353,24 @@ export const FEATURE_SPECS: Record<GenerationFeature, FeatureSpec> = {
   }),
   workflow_briefing: spec('workflow_briefing', {
     json: true,
-    defaults: { temperature: 0.3, maxTokens: 1400 },
+    defaults: { temperature: 0.3, maxTokens: 4096 },
     systemPrompt: ISOLAMENTO,
   }),
   workflow_briefing_generic: spec('workflow_briefing_generic', {
     clientBinding: 'none',
     json: true,
-    defaults: { temperature: 0.3, maxTokens: 1400 },
+    defaults: { temperature: 0.3, maxTokens: 4096 },
     systemPrompt: SEM_CLIENTE,
   }),
   workflow_briefing_stream: spec('workflow_briefing_stream', {
     json: true,
-    defaults: { temperature: 0.3, maxTokens: 1400 },
+    defaults: { temperature: 0.3, maxTokens: 4096 },
     systemPrompt: ISOLAMENTO,
   }),
   workflow_briefing_stream_generic: spec('workflow_briefing_stream_generic', {
     clientBinding: 'none',
     json: true,
-    defaults: { temperature: 0.3, maxTokens: 1400 },
+    defaults: { temperature: 0.3, maxTokens: 4096 },
     systemPrompt: SEM_CLIENTE,
   }),
   job_insights: spec('job_insights', {

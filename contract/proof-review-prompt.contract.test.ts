@@ -18,6 +18,11 @@ import {
   FECHAMENTO_PEDIDO_PELO_USUARIO as FECHAMENTO_DO_NORMAN,
   MONTAGEM_DO_FRAMEWORK as MONTAGEM_DO_NORMAN,
 } from '@norman/lib/briefing-conduction';
+import { REGRAS_DO_BRIEFING_DE_WORKFLOW as REGRAS_DE_WORKFLOW_DO_NORMAN } from '@norman/lib/workflow-briefing-rules';
+import {
+  REGRAS_DO_BRIEFING_DE_WORKFLOW as REGRAS_DE_WORKFLOW_DO_EXECUTOR,
+  renderWorkflowBriefingPrompt,
+} from '../src/gateway/feature-payloads';
 
 /**
  * As regras da revisão de arte, comparadas entre os dois serviços.
@@ -152,6 +157,35 @@ describe('a condução do briefing nos dois serviços', () => {
 
     for (const linha of CONDUCAO_DO_EXECUTOR) {
       expect(sistema).toContain(linha);
+    }
+  });
+});
+
+/**
+ * As regras do briefing de entregável, comparadas entre os dois serviços.
+ *
+ * Sem a regra de seguir, "vamos seguir em frente" voltava com as mesmas
+ * perguntas pendentes, porque o parser só aceita pronto com tudo preenchido.
+ */
+describe('o briefing de entregável nos dois serviços', () => {
+  it('tem as mesmas regras, linha a linha', () => {
+    expect(REGRAS_DE_WORKFLOW_DO_EXECUTOR).toEqual(REGRAS_DE_WORKFLOW_DO_NORMAN);
+  });
+
+  it('deixa a pessoa seguir, com o que falta marcado como "a definir"', () => {
+    const texto = REGRAS_DE_WORKFLOW_DO_EXECUTOR.join('\n');
+
+    expect(texto).toContain('seguir sem responder as perguntas pendentes');
+    expect(texto).toContain('exatamente \"a definir\", marque ready=true');
+  });
+
+  it('chega inteiro ao prompt do gateway', () => {
+    const prompt = renderWorkflowBriefingPrompt({
+      deliverableType: 'UX - Site',
+      questions: ['Qual o objetivo do site?'],
+    });
+    for (const linha of REGRAS_DE_WORKFLOW_DO_EXECUTOR) {
+      expect(prompt).toContain(linha);
     }
   });
 });
