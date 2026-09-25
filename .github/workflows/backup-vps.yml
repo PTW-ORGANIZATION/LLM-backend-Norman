@@ -1,0 +1,41 @@
+name: Backup da VPS
+
+# Roda por branch, e esta branch nao publica nada. O repositorio e publico:
+# o log so mostra nomes, versoes e tamanhos.
+on:
+  push:
+    branches:
+      - backup/vps-antes-da-formatacao
+
+permissions:
+  contents: read
+
+jobs:
+  inventario:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chave de acesso
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/vps
+          chmod 600 ~/.ssh/vps
+      - name: Inventario
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
+        run: |
+          {
+            for v in DB_HOST DB_PORT DB_USERNAME DB_PASSWORD DB_DATABASE REDIS_HOST REDIS_PORT OLLAMA_HOST; do
+              printf 'export %s=%q\n' "$v" "${!v}"
+            done
+            cat deploy/backup/inventario.sh
+          } | ssh -i ~/.ssh/vps -p "${{ secrets.SSH_PORT }}" -o StrictHostKeyChecking=accept-new \
+                "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s'
