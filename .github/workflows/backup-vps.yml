@@ -39,3 +39,44 @@ jobs:
             cat deploy/backup/inventario.sh
           } | ssh -i ~/.ssh/vps -p "${{ secrets.SSH_PORT }}" -o StrictHostKeyChecking=accept-new \
                 "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s'
+
+  backup:
+    needs: inventario
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chave de acesso
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/vps
+          chmod 600 ~/.ssh/vps
+      - name: Coletar e criptografar
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -o pipefail
+          umask 077
+          {
+            for v in DB_HOST DB_PORT DB_USERNAME DB_PASSWORD DB_DATABASE REDIS_HOST REDIS_PORT OLLAMA_HOST; do
+              printf 'export %s=%q\n' "$v" "${!v}"
+            done
+            cat deploy/backup/coletar.sh
+          } | ssh -i ~/.ssh/vps -p "${{ secrets.SSH_PORT }}" -o StrictHostKeyChecking=accept-new \
+                "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s' \
+            | openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -pass env:BACKUP_PASSPHRASE -out backup-vps.tar.gz.enc
+          ls -l backup-vps.tar.gz.enc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-vps-criptografado
+          path: backup-vps.tar.gz.enc
+          retention-days: 1
+          if-no-files-found: error
