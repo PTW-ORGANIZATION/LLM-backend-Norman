@@ -30,7 +30,7 @@ psql $CONEXAO -d "$DB_DATABASE" -At -c "select extname || ' ' || extversion from
 
 copiar() {
   local origem="$1" destino="$2"
-  if [ -e "$origem" ] && cp -a "$origem" "$destino" 2>/dev/null; then
+  if [ -e "$origem" ] && cp -RL "$origem" "$destino" 2>/dev/null; then
     registrar "ok     $origem"
   else
     registrar "falhou $origem"
