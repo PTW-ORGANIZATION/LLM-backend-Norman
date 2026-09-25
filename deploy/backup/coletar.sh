@@ -51,6 +51,30 @@ copiar /etc/postgresql/17/main/pg_hba.conf sistema/pg_hba.conf
 copiar /etc/systemd/system/ollama.service sistema/ollama.service
 copiar /etc/systemd/system/ollama.service.d sistema/ollama.service.d
 
+# Legiveis por qualquer usuario, e uteis para reconstruir igual.
+copiar /etc/ssh/sshd_config sistema/sshd_config
+copiar /etc/ssh/sshd_config.d sistema/sshd_config.d
+copiar /etc/nginx/nginx.conf sistema/nginx.conf
+copiar /etc/hosts sistema/hosts
+copiar /etc/fstab sistema/fstab
+copiar /etc/apt/sources.list.d sistema/apt-sources.list.d
+dpkg-query -W -f '${Package}\n' > sistema/pacotes-instalados.txt 2>/dev/null && registrar "ok     lista de pacotes"
+getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 {print $1}' > sistema/usuarios.txt && registrar "ok     lista de usuarios"
+
+# O que so o root le. Funciona se o usuario do deploy tiver sudo sem senha;
+# se nao tiver, registra a falha e segue.
+mkdir -p root
+if sudo -n true 2>/dev/null; then
+  sudo -n tar czf - /etc/nginx /etc/letsencrypt /etc/redis /etc/postgresql /etc/ssh \
+    /etc/ufw /etc/iptables /var/spool/cron 2>/dev/null > root/etc-root.tgz
+  registrar "ok     arquivos do root ($(du -h root/etc-root.tgz | cut -f1))"
+  sudo -n crontab -l > root/crontab-root.txt 2>/dev/null
+  { sudo -n ufw status verbose; sudo -n iptables-save; sudo -n nft list ruleset; } > root/firewall.txt 2>/dev/null
+  registrar "ok     firewall e crontab do root"
+else
+  registrar "falhou arquivos do root (sudo pede senha)"
+fi
+
 (cd "$HOME/llm-backend" && git rev-parse HEAD) > sistema/commit-do-llm-backend.txt 2>/dev/null \
   && registrar "ok     commit publicado do llm-backend"
 curl -s -m 10 "$OLLAMA_HOST/api/tags" > sistema/ollama-modelos.json 2>/dev/null && registrar "ok     lista de modelos do ollama"
