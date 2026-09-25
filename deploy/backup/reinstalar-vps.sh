@@ -17,6 +17,9 @@
 #                              script escreve uma equivalente
 #   PULAR_MODELOS=1            não baixa os modelos do Ollama (~15 GB)
 #
+# Se a pasta tiver root/etc-root.tgz (cópia de /etc feita por quem tinha root),
+# o certificado e o site nginx originais são restaurados dela.
+#
 # Depois dele, rode o deploy normal do LLM-backend (push ou re-run na main): é
 # o deploy que reescreve o .env a partir dos secrets do GitHub.
 set -euo pipefail
@@ -150,6 +153,17 @@ curl -s "http://127.0.0.1:$PORTA/health"; echo
 
 passo "8. nginx com TLS na porta 8443"
 SITE=/etc/nginx/sites-available/llm-backend-internal.conf
+# Se alguém com root copiou /etc antes da formatação (root/etc-root.tgz), o
+# certificado e o site originais voltam de lá, e o certbot não é chamado.
+if [ -f "$BACKUP/root/etc-root.tgz" ]; then
+  tar xzf "$BACKUP/root/etc-root.tgz" -C / etc/letsencrypt 2>/dev/null \
+    && echo "certificado restaurado da cópia do root"
+  if [ -z "${NGINX_ORIGINAL:-}" ]; then
+    NGINX_ORIGINAL=$(mktemp)
+    tar xzf "$BACKUP/root/etc-root.tgz" -O etc/nginx/sites-available/llm-backend-internal.conf > "$NGINX_ORIGINAL" 2>/dev/null \
+      && [ -s "$NGINX_ORIGINAL" ] && echo "site nginx original restaurado da cópia do root" || NGINX_ORIGINAL=
+  fi
+fi
 if [ ! -f "/etc/letsencrypt/live/$DOMINIO/fullchain.pem" ]; then
   if [ -n "${EMAIL_CERT:-}" ]; then
     certbot certonly --nginx --non-interactive --agree-tos -m "$EMAIL_CERT" -d "$DOMINIO"
