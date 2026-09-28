@@ -205,6 +205,10 @@ fi
 ln -sf "$SITE" /etc/nginx/sites-enabled/llm-backend-internal.conf
 nginx -t
 systemctl reload nginx
+# O certificado restaurado da cópia do root pode estar perto de vencer (o de
+# 25/09/2026 vence em 13/11/2026). O renew só age a menos de 30 dias do fim.
+certbot renew --cert-name "$DOMINIO" --non-interactive || echo "renovação do certificado falhou: confira a porta 80 e o DNS"
+systemctl reload nginx
 curl -s "https://$DOMINIO:8443/health"; echo
 
 passo "Pronto"
